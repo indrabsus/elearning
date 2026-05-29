@@ -1,65 +1,247 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { supabase } from "@/lib/supabase"
+
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+
+type TahunAjaran = {
+  id_tahun_ajaran: string
+  nama_tahun_ajaran: string
+  aktif: boolean
+}
+
+export default function LoginPage() {
+  const router = useRouter()
+
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [tahunAjaranList, setTahunAjaranList] = useState<TahunAjaran[]>([])
+  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState("")
+
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    const getTahunAjaran = async () => {
+      const { data, error } = await supabase
+        .from("tahun_ajaran")
+        .select("id_tahun_ajaran, nama_tahun_ajaran, aktif")
+        .order("nama_tahun_ajaran", { ascending: false })
+
+      if (error) {
+        setError(error.message)
+        return
+      }
+
+      const list = data ?? []
+      setTahunAjaranList(list)
+
+      const tahunAktif = list.find((item) => item.aktif)
+
+      if (tahunAktif) {
+        setSelectedTahunAjaran(tahunAktif.id_tahun_ajaran)
+      } else if (list.length > 0) {
+        setSelectedTahunAjaran(list[0].id_tahun_ajaran)
+      }
+    }
+
+    getTahunAjaran()
+  }, [])
+
+  const simpanTahunAjaran = () => {
+    const tahunDipilih = tahunAjaranList.find(
+      (item) => item.id_tahun_ajaran === selectedTahunAjaran
+    )
+
+    localStorage.setItem("id_tahun_ajaran", selectedTahunAjaran)
+    localStorage.setItem(
+      "nama_tahun_ajaran",
+      tahunDipilih?.nama_tahun_ajaran || ""
+    )
+  }
+
+  const handleLogin = async (e: React.BaseSyntheticEvent) => {
+    e.preventDefault()
+
+    setError("")
+
+    if (!email || !password) {
+      setError("Email dan password wajib diisi")
+      return
+    }
+
+    if (!selectedTahunAjaran) {
+      setError("Tahun ajaran wajib dipilih")
+      return
+    }
+
+    setLoading(true)
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+      return
+    }
+
+    if (!data.user) {
+      setError("User tidak ditemukan")
+      setLoading(false)
+      return
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role, nisn, uid_guru")
+      .eq("id", data.user.id)
+      .single()
+
+    if (profileError || !profile) {
+      setError("Profile user tidak ditemukan")
+      setLoading(false)
+      return
+    }
+
+    simpanTahunAjaran()
+
+    if (profile.role === "admin") {
+      router.push("/admin/dashboard")
+      return
+    }
+
+    if (profile.role === "siswa") {
+      if (!profile.nisn) {
+        router.push("/verifikasi-siswa")
+        return
+      }
+
+      router.push("/siswa/dashboard")
+      return
+    }
+
+    if (profile.role === "guru") {
+      if (!profile.uid_guru) {
+        router.push("/verifikasi-guru")
+        return
+      }
+
+      const { data: pembagianMengajar, error: pembagianError } =
+        await supabase
+          .from("mapel_kelas_guru")
+          .select("id_mapel_kelas_guru")
+          .eq("uid_guru", profile.uid_guru)
+          .eq("id_tahun_ajaran", selectedTahunAjaran)
+          .limit(1)
+
+      if (pembagianError) {
+        setError(pembagianError.message)
+        setLoading(false)
+        return
+      }
+
+      if (!pembagianMengajar || pembagianMengajar.length === 0) {
+        router.push("/verifikasi-guru?mode=mengajar")
+        return
+      }
+
+      router.push("/guru/dashboard")
+      return
+    }
+
+    setError("Role user tidak dikenali")
+    setLoading(false)
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4 dark:bg-slate-950">
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader>
+          <CardTitle className="text-center text-2xl">
+            Login E-Learning
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="Masukkan email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input
+                type="password"
+                placeholder="Masukkan password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tahun Ajaran</Label>
+              <select
+                value={selectedTahunAjaran}
+                onChange={(e) => setSelectedTahunAjaran(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Pilih tahun ajaran</option>
+
+                {tahunAjaranList.map((tahun) => (
+                  <option
+                    key={tahun.id_tahun_ajaran}
+                    value={tahun.id_tahun_ajaran}
+                  >
+                    {tahun.nama_tahun_ajaran}
+                    {tahun.aktif ? " (Aktif)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {error && (
+              <p className="text-sm text-red-500">
+                {error}
+              </p>
+            )}
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+              {loading ? "Memproses..." : "Login"}
+            </Button>
+          </form>
+
+          <p className="mt-4 text-center text-sm text-slate-500">
+            Belum punya akun?{" "}
+            <Link href="/register" className="font-medium underline">
+              Register
+            </Link>
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+        </CardContent>
+      </Card>
+    </main>
+  )
 }
