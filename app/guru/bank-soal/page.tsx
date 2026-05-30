@@ -20,7 +20,7 @@ export type OpsiForm = {
   is_benar: boolean
 }
 
-type BankSoal = {
+export type BankSoal = {
   id_soal: string;
   id_mapel: string;
   uid_guru: string;
