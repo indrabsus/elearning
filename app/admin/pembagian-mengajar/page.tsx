@@ -1,28 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Plus,
-  Trash2,
-  Search,
-  ArrowUpDown,
-} from "lucide-react";
+import { Plus, Trash2, Search, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type Guru = {
   uid: string;
-  nama_lengkap: string | null;
+  nama_lengkap: string;
 };
 
 type Mapel = {
   id_mapel: string;
-  nama_mapel: string | null;
+  nama_mapel: string;
 };
 
 type Kelas = {
   id_kelas: string;
-  tingkat: number | null;
-  nama_kelas: string | null;
+  tingkat: number;
+  nama_kelas: string;
 };
 
 type PembagianMengajar = {
@@ -31,9 +26,9 @@ type PembagianMengajar = {
   id_mapel: string;
   id_kelas: string;
   id_tahun_ajaran: string;
-  guru: Guru | null;
-  mapel: Mapel | null;
-  kelas: Kelas | null;
+  guru: Guru[] | null;
+  mapel: Mapel[] | null;
+  kelas: Kelas[] | null;
 };
 
 const ITEMS_PER_PAGE = 10;
@@ -57,10 +52,8 @@ export default function PembagianMengajarPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  const [sortKey, setSortKey] =
-    useState<"guru" | "mapel" | "kelas">("guru");
-  const [sortDirection, setSortDirection] =
-    useState<"asc" | "desc">("asc");
+  const [sortKey, setSortKey] = useState<"guru" | "mapel" | "kelas">("guru");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const reloadAll = async () => {
     setLoading(true);
@@ -77,48 +70,47 @@ export default function PembagianMengajarPage() {
       return;
     }
 
-    const [guruRes, mapelRes, kelasRes, mengajarRes] =
-      await Promise.all([
-        supabase
-          .from("guru")
-          .select("uid, nama_lengkap")
-          .order("nama_lengkap", { ascending: true }),
+    const [guruRes, mapelRes, kelasRes, mengajarRes] = await Promise.all([
+      supabase
+        .from("guru")
+        .select("uid, nama_lengkap")
+        .order("nama_lengkap", { ascending: true }),
 
-        supabase
-          .from("mapel")
-          .select("id_mapel, nama_mapel")
-          .order("nama_mapel", { ascending: true }),
+      supabase
+        .from("mapel")
+        .select("id_mapel, nama_mapel")
+        .order("nama_mapel", { ascending: true }),
 
-        supabase
-          .from("kelas")
-          .select("id_kelas, tingkat, nama_kelas")
-          .order("tingkat", { ascending: true })
-          .order("nama_kelas", { ascending: true }),
+      supabase
+        .from("kelas")
+        .select("id_kelas, tingkat, nama_kelas")
+        .order("tingkat", { ascending: true })
+        .order("nama_kelas", { ascending: true }),
 
-        supabase
-          .from("mapel_kelas_guru")
-          .select(`
-            id_mapel_kelas_guru,
-            uid_guru,
+      supabase
+        .from("mapel_kelas_guru")
+        .select(`
+          id_mapel_kelas_guru,
+          uid_guru,
+          id_mapel,
+          id_kelas,
+          id_tahun_ajaran,
+          guru:uid_guru (
+            uid,
+            nama_lengkap
+          ),
+          mapel:id_mapel (
             id_mapel,
+            nama_mapel
+          ),
+          kelas:id_kelas (
             id_kelas,
-            id_tahun_ajaran,
-            guru:uid_guru (
-              uid,
-              nama_lengkap
-            ),
-            mapel:id_mapel (
-              id_mapel,
-              nama_mapel
-            ),
-            kelas:id_kelas (
-              id_kelas,
-              tingkat,
-              nama_kelas
-            )
-          `)
-          .eq("id_tahun_ajaran", tahunId),
-      ]);
+            tingkat,
+            nama_kelas
+          )
+        `)
+        .eq("id_tahun_ajaran", tahunId),
+    ]);
 
     if (guruRes.error) console.error(guruRes.error.message);
     if (mapelRes.error) console.error(mapelRes.error.message);
@@ -128,7 +120,7 @@ export default function PembagianMengajarPage() {
     setGuruList(guruRes.data ?? []);
     setMapelList(mapelRes.data ?? []);
     setKelasList(kelasRes.data ?? []);
-    setDataMengajar((mengajarRes.data ?? []) as PembagianMengajar[]);
+    setDataMengajar((mengajarRes.data ?? []) as unknown as PembagianMengajar[]);
 
     setLoading(false);
   };
@@ -149,9 +141,7 @@ export default function PembagianMengajarPage() {
 
   const handleSort = (key: "guru" | "mapel" | "kelas") => {
     if (sortKey === key) {
-      setSortDirection((prev) =>
-        prev === "asc" ? "desc" : "asc"
-      );
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
       setSortDirection("asc");
@@ -160,7 +150,7 @@ export default function PembagianMengajarPage() {
     setPage(1);
   };
 
-  const handleSubmit = async (e: React.BaseSyntheticEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!uidGuru || !idMapel || !idKelas) {
@@ -193,14 +183,12 @@ export default function PembagianMengajarPage() {
       return;
     }
 
-    const { error } = await supabase
-      .from("mapel_kelas_guru")
-      .insert({
-        uid_guru: uidGuru,
-        id_mapel: idMapel,
-        id_kelas: idKelas,
-        id_tahun_ajaran: tahunId,
-      });
+    const { error } = await supabase.from("mapel_kelas_guru").insert({
+      uid_guru: uidGuru,
+      id_mapel: idMapel,
+      id_kelas: idKelas,
+      id_tahun_ajaran: tahunId,
+    });
 
     if (error) {
       alert(error.message);
@@ -236,37 +224,34 @@ export default function PembagianMengajarPage() {
   const filteredData = dataMengajar.filter((item) => {
     const keyword = search.toLowerCase();
 
+    const guru = item.guru?.[0];
+    const mapel = item.mapel?.[0];
+    const kelas = item.kelas?.[0];
+
     return (
-      String(item.guru?.nama_lengkap ?? "")
-        .toLowerCase()
-        .includes(keyword) ||
-      String(item.mapel?.nama_mapel ?? "")
-        .toLowerCase()
-        .includes(keyword) ||
-      String(item.kelas?.nama_kelas ?? "")
-        .toLowerCase()
-        .includes(keyword) ||
-      String(item.kelas?.tingkat ?? "").includes(keyword)
+      String(guru?.nama_lengkap ?? "").toLowerCase().includes(keyword) ||
+      String(mapel?.nama_mapel ?? "").toLowerCase().includes(keyword) ||
+      String(kelas?.nama_kelas ?? "").toLowerCase().includes(keyword) ||
+      String(kelas?.tingkat ?? "").includes(keyword)
     );
   });
 
   const getSortValue = (item: PembagianMengajar) => {
-    if (sortKey === "guru") return item.guru?.nama_lengkap ?? "";
-    if (sortKey === "mapel") return item.mapel?.nama_mapel ?? "";
-    return `${item.kelas?.tingkat ?? ""} ${item.kelas?.nama_kelas ?? ""}`;
+    const guru = item.guru?.[0];
+    const mapel = item.mapel?.[0];
+    const kelas = item.kelas?.[0];
+
+    if (sortKey === "guru") return guru?.nama_lengkap ?? "";
+    if (sortKey === "mapel") return mapel?.nama_mapel ?? "";
+    return `${kelas?.tingkat ?? ""} ${kelas?.nama_kelas ?? ""}`;
   };
 
   const sortedData = [...filteredData].sort((a, b) => {
     const aValue = getSortValue(a).toLowerCase();
     const bValue = getSortValue(b).toLowerCase();
 
-    if (aValue < bValue) {
-      return sortDirection === "asc" ? -1 : 1;
-    }
-
-    if (aValue > bValue) {
-      return sortDirection === "asc" ? 1 : -1;
-    }
+    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
 
     return 0;
   });
@@ -454,40 +439,48 @@ export default function PembagianMengajarPage() {
                     </td>
                   </tr>
                 ) : (
-                  paginatedData.map((item, index) => (
-                    <tr
-                      key={item.id_mapel_kelas_guru}
-                      className="border-b border-gray-100 dark:border-gray-800"
-                    >
-                      <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
-                        {(page - 1) * ITEMS_PER_PAGE + index + 1}
-                      </td>
+                  paginatedData.map((item, index) => {
+                    const guru = item.guru?.[0];
+                    const mapel = item.mapel?.[0];
+                    const kelas = item.kelas?.[0];
 
-                      <td className="py-3 pr-4 font-medium text-gray-800 dark:text-white">
-                        {item.guru?.nama_lengkap ?? "-"}
-                      </td>
+                    return (
+                      <tr
+                        key={item.id_mapel_kelas_guru}
+                        className="border-b border-gray-100 dark:border-gray-800"
+                      >
+                        <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
+                          {(page - 1) * ITEMS_PER_PAGE + index + 1}
+                        </td>
 
-                      <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
-                        {item.mapel?.nama_mapel ?? "-"}
-                      </td>
+                        <td className="py-3 pr-4 font-medium text-gray-800 dark:text-white">
+                          {guru?.nama_lengkap ?? "-"}
+                        </td>
 
-                      <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
-                        {item.kelas?.tingkat} - {item.kelas?.nama_kelas}
-                      </td>
+                        <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
+                          {mapel?.nama_mapel ?? "-"}
+                        </td>
 
-                      <td className="py-3 pr-4">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleDelete(item.id_mapel_kelas_guru)
-                          }
-                          className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
+                          {kelas
+                            ? `${kelas.tingkat} - ${kelas.nama_kelas}`
+                            : "-"}
+                        </td>
+
+                        <td className="py-3 pr-4">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDelete(item.id_mapel_kelas_guru)
+                            }
+                            className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
