@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Plus, Trash2 } from "lucide-react"
 
@@ -17,8 +17,8 @@ import {
 
 type Guru = {
   uid: string
-  no_hp: string
-  nama_lengkap: string
+  no_hp: string | null
+  nama_lengkap: string | null
 }
 
 type Kelas = {
@@ -37,13 +37,13 @@ type PilihanMengajar = {
   id_kelas: string
 }
 
-export default function VerifikasiGuruPage() {
+function VerifikasiGuruContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-
   const modeParam = searchParams.get("mode")
 
-  const [mode, setMode] = useState<"verifikasi" | "mengajar">("verifikasi")
+  const [mode, setMode] =
+    useState<"verifikasi" | "mengajar">("verifikasi")
 
   const [uid, setUid] = useState("")
   const [noHp, setNoHp] = useState("")
@@ -86,13 +86,13 @@ export default function VerifikasiGuruPage() {
         return
       }
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("role, uid_guru")
         .eq("id", userData.user.id)
         .single()
 
-      if (!profile || profile.role !== "guru") {
+      if (profileError || !profile || profile.role !== "guru") {
         router.push("/")
         return
       }
@@ -105,9 +105,9 @@ export default function VerifikasiGuruPage() {
           .single()
 
         if (guruData) {
-          setGuru(guruData)
-          setUid(guruData.uid)
-          setNoHp(guruData.no_hp)
+          setGuru(guruData as Guru)
+          setUid(String(guruData.uid))
+          setNoHp(String(guruData.no_hp ?? ""))
           setMode("mengajar")
         }
       } else {
@@ -131,8 +131,18 @@ export default function VerifikasiGuruPage() {
           .order("nama_mapel", { ascending: true }),
       ])
 
-      setKelasList(kelasRes.data ?? [])
-      setMapelList(mapelRes.data ?? [])
+      if (kelasRes.error) {
+        setError(kelasRes.error.message)
+        return
+      }
+
+      if (mapelRes.error) {
+        setError(mapelRes.error.message)
+        return
+      }
+
+      setKelasList((kelasRes.data ?? []) as Kelas[])
+      setMapelList((mapelRes.data ?? []) as Mapel[])
     }
 
     initPage()
@@ -144,7 +154,10 @@ export default function VerifikasiGuruPage() {
     setError("")
     setGuru(null)
 
-    if (!uid || !noHp) {
+    const uidTrim = uid.trim()
+    const noHpTrim = noHp.trim()
+
+    if (!uidTrim || !noHpTrim) {
       setError("UID dan nomor HP wajib diisi")
       return
     }
@@ -154,17 +167,23 @@ export default function VerifikasiGuruPage() {
     const { data, error } = await supabase
       .from("guru")
       .select("uid, no_hp, nama_lengkap")
-      .eq("uid", uid)
-      .eq("no_hp", noHp)
-      .single()
+      .eq("uid", uidTrim)
+      .eq("no_hp", noHpTrim)
+      .maybeSingle()
 
-    if (error || !data) {
+    if (error) {
+      setError(error.message)
+      setLoading(false)
+      return
+    }
+
+    if (!data) {
       setError("Data guru tidak ditemukan atau nomor HP tidak sesuai")
       setLoading(false)
       return
     }
 
-    setGuru(data)
+    setGuru(data as Guru)
     setMode("mengajar")
     setLoading(false)
   }
@@ -180,7 +199,9 @@ export default function VerifikasiGuruPage() {
   }
 
   const hapusPilihanMengajar = (index: number) => {
-    setPilihanMengajar((prev) => prev.filter((_, i) => i !== index))
+    setPilihanMengajar((prev) =>
+      prev.filter((_, i) => i !== index)
+    )
   }
 
   const ubahPilihanMengajar = (
@@ -247,12 +268,19 @@ export default function VerifikasiGuruPage() {
       return
     }
 
-    const { data: existingProfile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("uid_guru", guru.uid)
-      .neq("id", userData.user.id)
-      .maybeSingle()
+    const { data: existingProfile, error: existingProfileError } =
+      await supabase
+        .from("profiles")
+        .select("id")
+        .eq("uid_guru", guru.uid)
+        .neq("id", userData.user.id)
+        .maybeSingle()
+
+    if (existingProfileError) {
+      setError(existingProfileError.message)
+      setLoading(false)
+      return
+    }
 
     if (existingProfile) {
       setError("UID guru sudah digunakan akun lain")
@@ -268,14 +296,21 @@ export default function VerifikasiGuruPage() {
     }))
 
     for (const item of dataInsert) {
-      const { data: existingMengajar } = await supabase
-        .from("mapel_kelas_guru")
-        .select("id_mapel_kelas_guru")
-        .eq("uid_guru", item.uid_guru)
-        .eq("id_mapel", item.id_mapel)
-        .eq("id_kelas", item.id_kelas)
-        .eq("id_tahun_ajaran", item.id_tahun_ajaran)
-        .maybeSingle()
+      const { data: existingMengajar, error: existingMengajarError } =
+        await supabase
+          .from("mapel_kelas_guru")
+          .select("id_mapel_kelas_guru")
+          .eq("uid_guru", item.uid_guru)
+          .eq("id_mapel", item.id_mapel)
+          .eq("id_kelas", item.id_kelas)
+          .eq("id_tahun_ajaran", item.id_tahun_ajaran)
+          .maybeSingle()
+
+      if (existingMengajarError) {
+        setError(existingMengajarError.message)
+        setLoading(false)
+        return
+      }
 
       if (existingMengajar) {
         setError("Pembagian mengajar tersebut sudah ada di tahun ajaran ini")
@@ -365,12 +400,12 @@ export default function VerifikasiGuruPage() {
                 </h3>
 
                 <p className="text-sm">
-                  <b>Nama Lengkap:</b> {guru.nama_lengkap}
+                  <b>Nama Lengkap:</b> {guru.nama_lengkap || "-"}
                 </p>
 
                 <p className="mt-1 text-sm text-slate-500">
                   Silakan pilih mapel dan kelas untuk tahun ajaran{" "}
-                  <b>{namaTahunAjaran}</b>.
+                  <b>{namaTahunAjaran || "-"}</b>.
                 </p>
               </div>
 
@@ -476,5 +511,19 @@ export default function VerifikasiGuruPage() {
         </CardContent>
       </Card>
     </main>
+  )
+}
+
+export default function VerifikasiGuruPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4 dark:bg-slate-950">
+          Loading...
+        </main>
+      }
+    >
+      <VerifikasiGuruContent />
+    </Suspense>
   )
 }

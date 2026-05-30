@@ -2,26 +2,46 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, CheckCircle2, Search, Save, Trash2 } from "lucide-react"
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Search,
+  Save,
+  Trash2,
+} from "lucide-react"
 import { supabase } from "@/lib/supabase"
+
+type Mapel = {
+  nama_mapel: string | null
+}
+
+type Kelas = {
+  tingkat: number | null
+  nama_kelas: string | null
+}
+
+type MapelKelasGuru = {
+  id_mapel: string | null
+  id_kelas: string | null
+  uid_guru: number | null
+  mapel: Mapel | Mapel[] | null
+  kelas: Kelas | Kelas[] | null
+}
 
 type Tugas = {
   id_tugas: string
   judul: string
   tipe_tugas: string | null
   id_mapel_kelas_guru: string
-  mapel_kelas_guru: {
-    id_mapel: string | null
-    id_kelas: string | null
-    uid_guru: number | null
-    mapel: {
-      nama_mapel: string | null
-    } | null
-    kelas: {
-      tingkat: number | null
-      nama_kelas: string | null
-    } | null
-  } | null
+  mapel_kelas_guru: MapelKelasGuru | MapelKelasGuru[] | null
+}
+
+type OpsiJawaban = {
+  id_opsi: string
+  label: string
+  isi_opsi: string
+  is_benar: boolean | null
+  gambar_url: string | null
 }
 
 type BankSoal = {
@@ -31,13 +51,7 @@ type BankSoal = {
   tingkat_kesulitan: string | null
   gambar_url: string | null
   audio_url: string | null
-  opsi_jawaban: {
-    id_opsi: string
-    label: string
-    isi_opsi: string
-    is_benar: boolean | null
-    gambar_url: string | null
-  }[]
+  opsi_jawaban: OpsiJawaban[]
 }
 
 type TugasSoal = {
@@ -46,6 +60,11 @@ type TugasSoal = {
   id_soal: string
   nomor: number
   bobot: number | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 export default function KelolaSoalTugasPage() {
@@ -116,9 +135,10 @@ export default function KelolaSoalTugasPage() {
       return
     }
 
-    const tugasFinal = tugasData as Tugas
+    const tugasFinal = tugasData as unknown as Tugas
+    const relasiMengajar = firstItem(tugasFinal.mapel_kelas_guru)
 
-    if (tugasFinal.mapel_kelas_guru?.uid_guru !== uidGuru) {
+    if (Number(relasiMengajar?.uid_guru) !== uidGuru) {
       alert("Anda tidak memiliki akses ke tugas ini")
       router.push("/guru/tugas")
       return
@@ -132,7 +152,7 @@ export default function KelolaSoalTugasPage() {
 
     setTugas(tugasFinal)
 
-    const idMapel = tugasFinal.mapel_kelas_guru?.id_mapel
+    const idMapel = relasiMengajar?.id_mapel
 
     if (!idMapel) {
       alert("Mapel tugas tidak ditemukan")
@@ -168,7 +188,7 @@ export default function KelolaSoalTugasPage() {
       return
     }
 
-    setBankSoal((soalData ?? []) as BankSoal[])
+    setBankSoal((soalData ?? []) as unknown as BankSoal[])
 
     const { data: tugasSoalData, error: tugasSoalError } = await supabase
       .from("tugas_soal")
@@ -283,6 +303,10 @@ export default function KelolaSoalTugasPage() {
     .map((id) => bankSoal.find((soal) => soal.id_soal === id))
     .filter(Boolean) as BankSoal[]
 
+  const relasiMengajar = firstItem(tugas?.mapel_kelas_guru)
+  const mapel = firstItem(relasiMengajar?.mapel)
+  const kelas = firstItem(relasiMengajar?.kelas)
+
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -308,9 +332,8 @@ export default function KelolaSoalTugasPage() {
         </h1>
 
         <p className="text-slate-500 dark:text-slate-400">
-          {tugas?.judul} • {tugas?.mapel_kelas_guru?.mapel?.nama_mapel} • Kelas{" "}
-          {tugas?.mapel_kelas_guru?.kelas?.tingkat}{" "}
-          {tugas?.mapel_kelas_guru?.kelas?.nama_kelas}
+          {tugas?.judul ?? "-"} • {mapel?.nama_mapel ?? "-"} • Kelas{" "}
+          {kelas?.tingkat ?? "-"} {kelas?.nama_kelas ?? "-"}
         </p>
       </div>
 

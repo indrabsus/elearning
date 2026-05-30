@@ -13,15 +13,19 @@ import {
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
+type Mapel = {
+  nama_mapel: string | null
+}
+
+type Kelas = {
+  tingkat: number | null
+  nama_kelas: string | null
+}
+
 type Mengajar = {
   id_mapel_kelas_guru: string
-  mapel: {
-    nama_mapel: string | null
-  } | null
-  kelas: {
-    tingkat: number | null
-    nama_kelas: string | null
-  } | null
+  mapel: Mapel | Mapel[] | null
+  kelas: Kelas | Kelas[] | null
 }
 
 type Tugas = {
@@ -33,7 +37,12 @@ type Tugas = {
   status: string | null
   tipe_tugas: string | null
   created_at: string | null
-  mapel_kelas_guru: Mengajar | null
+  mapel_kelas_guru: Mengajar | Mengajar[] | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 const ITEMS_PER_PAGE = 10
@@ -106,6 +115,7 @@ export default function GuruTugasPage() {
 
     if (!idTahunAjaran) {
       alert("Tahun ajaran belum dipilih. Silakan login ulang.")
+      setLoading(false)
       router.push("/")
       return
     }
@@ -131,7 +141,9 @@ export default function GuruTugasPage() {
       return
     }
 
-    const daftarMengajar = (mengajarData ?? []) as Mengajar[]
+    const daftarMengajar =
+      (mengajarData ?? []) as unknown as Mengajar[]
+
     setMengajarList(daftarMengajar)
 
     const ids = daftarMengajar.map((item) => item.id_mapel_kelas_guru)
@@ -173,7 +185,7 @@ export default function GuruTugasPage() {
       return
     }
 
-    setTugasList((tugasData ?? []) as Tugas[])
+    setTugasList((tugasData ?? []) as unknown as Tugas[])
     setLoading(false)
   }
 
@@ -226,9 +238,7 @@ export default function GuruTugasPage() {
         return
       }
     } else {
-      const { error } = await supabase
-        .from("tugas")
-        .insert(payload)
+      const { error } = await supabase.from("tugas").insert(payload)
 
       if (error) {
         alert(error.message)
@@ -261,10 +271,7 @@ export default function GuruTugasPage() {
       setDeadline("")
     }
 
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    })
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   const handleDelete = async (id: string) => {
@@ -299,33 +306,47 @@ export default function GuruTugasPage() {
     setPage(1)
   }
 
+  const getMengajarLabel = (item: Mengajar) => {
+    const mapel = firstItem(item.mapel)
+    const kelas = firstItem(item.kelas)
+
+    return `${mapel?.nama_mapel ?? "-"} - Kelas ${
+      kelas?.tingkat ?? "-"
+    } ${kelas?.nama_kelas ?? "-"}`
+  }
+
+  const getTugasRelasi = (item: Tugas) => {
+    const mengajar = firstItem(item.mapel_kelas_guru)
+    const mapel = firstItem(mengajar?.mapel)
+    const kelas = firstItem(mengajar?.kelas)
+
+    return { mengajar, mapel, kelas }
+  }
+
   const filteredTugas = tugasList.filter((item) => {
     const keyword = search.toLowerCase()
+    const { mapel, kelas } = getTugasRelasi(item)
 
     return (
       item.judul.toLowerCase().includes(keyword) ||
       String(item.deskripsi ?? "").toLowerCase().includes(keyword) ||
       String(item.tipe_tugas ?? "").toLowerCase().includes(keyword) ||
       String(item.status ?? "").toLowerCase().includes(keyword) ||
-      String(item.mapel_kelas_guru?.mapel?.nama_mapel ?? "")
-        .toLowerCase()
-        .includes(keyword) ||
-      String(item.mapel_kelas_guru?.kelas?.nama_kelas ?? "")
-        .toLowerCase()
-        .includes(keyword)
+      String(mapel?.nama_mapel ?? "").toLowerCase().includes(keyword) ||
+      String(kelas?.nama_kelas ?? "").toLowerCase().includes(keyword) ||
+      String(kelas?.tingkat ?? "").includes(keyword)
     )
   })
 
   const getSortValue = (item: Tugas) => {
+    const { mapel, kelas } = getTugasRelasi(item)
+
     if (sortKey === "judul") return item.judul ?? ""
-    if (sortKey === "mapel") {
-      return item.mapel_kelas_guru?.mapel?.nama_mapel ?? ""
-    }
+    if (sortKey === "mapel") return mapel?.nama_mapel ?? ""
     if (sortKey === "kelas") {
-      return `${item.mapel_kelas_guru?.kelas?.tingkat ?? ""} ${
-        item.mapel_kelas_guru?.kelas?.nama_kelas ?? ""
-      }`
+      return `${kelas?.tingkat ?? ""} ${kelas?.nama_kelas ?? ""}`
     }
+
     return item.deadline ?? ""
   }
 
@@ -397,8 +418,7 @@ export default function GuruTugasPage() {
                     key={item.id_mapel_kelas_guru}
                     value={item.id_mapel_kelas_guru}
                   >
-                    {item.mapel?.nama_mapel} - Kelas{" "}
-                    {item.kelas?.tingkat} {item.kelas?.nama_kelas}
+                    {getMengajarLabel(item)}
                   </option>
                 ))}
               </select>
@@ -553,9 +573,7 @@ export default function GuruTugasPage() {
                     </button>
                   </th>
 
-                  <th className="py-3 pr-4 text-slate-500">
-                    Tipe
-                  </th>
+                  <th className="py-3 pr-4 text-slate-500">Tipe</th>
 
                   <th className="py-3 pr-4 text-slate-500">
                     <button
@@ -568,13 +586,8 @@ export default function GuruTugasPage() {
                     </button>
                   </th>
 
-                  <th className="py-3 pr-4 text-slate-500">
-                    Status
-                  </th>
-
-                  <th className="py-3 pr-4 text-slate-500">
-                    Aksi
-                  </th>
+                  <th className="py-3 pr-4 text-slate-500">Status</th>
+                  <th className="py-3 pr-4 text-slate-500">Aksi</th>
                 </tr>
               </thead>
 
@@ -589,76 +602,83 @@ export default function GuruTugasPage() {
                     </td>
                   </tr>
                 ) : (
-                  paginatedTugas.map((item, index) => (
-                    <tr
-                      key={item.id_tugas}
-                      className="border-b dark:border-slate-800"
-                    >
-                      <td className="py-3 pr-4">
-                        {(page - 1) * ITEMS_PER_PAGE + index + 1}
-                      </td>
+                  paginatedTugas.map((item, index) => {
+                    const { mapel, kelas } = getTugasRelasi(item)
 
-                      <td className="min-w-56 py-3 pr-4">
-                        <p className="font-medium">{item.judul}</p>
-                        <p className="line-clamp-1 text-xs text-slate-500">
-                          {item.deskripsi || "-"}
-                        </p>
-                      </td>
+                    return (
+                      <tr
+                        key={item.id_tugas}
+                        className="border-b dark:border-slate-800"
+                      >
+                        <td className="py-3 pr-4">
+                          {(page - 1) * ITEMS_PER_PAGE + index + 1}
+                        </td>
 
-                      <td className="py-3 pr-4">
-                        {item.mapel_kelas_guru?.mapel?.nama_mapel ?? "-"}
-                      </td>
+                        <td className="min-w-56 py-3 pr-4">
+                          <p className="font-medium">{item.judul}</p>
+                          <p className="line-clamp-1 text-xs text-slate-500">
+                            {item.deskripsi || "-"}
+                          </p>
+                        </td>
 
-                      <td className="py-3 pr-4">
-                        {item.mapel_kelas_guru?.kelas?.tingkat}{" "}
-                        {item.mapel_kelas_guru?.kelas?.nama_kelas}
-                      </td>
+                        <td className="py-3 pr-4">
+                          {mapel?.nama_mapel ?? "-"}
+                        </td>
 
-                      <td className="py-3 pr-4 capitalize">
-                        {String(item.tipe_tugas ?? "-").replace("_", " ")}
-                      </td>
+                        <td className="py-3 pr-4">
+                          {kelas
+                            ? `${kelas.tingkat ?? "-"} ${
+                                kelas.nama_kelas ?? "-"
+                              }`
+                            : "-"}
+                        </td>
 
-                      <td className="min-w-40 py-3 pr-4">
-                        {formatTanggal(item.deadline)}
-                      </td>
+                        <td className="py-3 pr-4 capitalize">
+                          {String(item.tipe_tugas ?? "-").replace("_", " ")}
+                        </td>
 
-                      <td className="py-3 pr-4 capitalize">
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs dark:bg-slate-800">
-                          {item.status ?? "-"}
-                        </span>
-                      </td>
+                        <td className="min-w-40 py-3 pr-4">
+                          {formatTanggal(item.deadline)}
+                        </td>
 
-                      <td className="py-3 pr-4">
-                        <div className="flex gap-2">
-                          {item.tipe_tugas === "pilihan_ganda" && (
-                            <Link
-                              href={`/guru/tugas/${item.id_tugas}/soal`}
-                              className="rounded-lg bg-blue-100 p-2 text-blue-700 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300"
-                              title="Kelola soal"
+                        <td className="py-3 pr-4 capitalize">
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs dark:bg-slate-800">
+                            {item.status ?? "-"}
+                          </span>
+                        </td>
+
+                        <td className="py-3 pr-4">
+                          <div className="flex gap-2">
+                            {item.tipe_tugas === "pilihan_ganda" && (
+                              <Link
+                                href={`/guru/tugas/${item.id_tugas}/soal`}
+                                className="rounded-lg bg-blue-100 p-2 text-blue-700 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300"
+                                title="Kelola soal"
+                              >
+                                <ListChecks size={16} />
+                              </Link>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(item)}
+                              className="rounded-lg bg-yellow-100 p-2 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-950 dark:text-yellow-300"
                             >
-                              <ListChecks size={16} />
-                            </Link>
-                          )}
+                              <Pencil size={16} />
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => handleEdit(item)}
-                            className="rounded-lg bg-yellow-100 p-2 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-950 dark:text-yellow-300"
-                          >
-                            <Pencil size={16} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(item.id_tugas)}
-                            className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(item.id_tugas)}
+                              className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>

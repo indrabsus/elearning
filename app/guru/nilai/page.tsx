@@ -14,15 +14,23 @@ import {
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
+type Mapel = {
+  nama_mapel: string | null
+}
+
+type Kelas = {
+  tingkat: number | null
+  nama_kelas: string | null
+}
+
+type SiswaRelasi = {
+  nama_lengkap: string | null
+}
+
 type Mengajar = {
   id_mapel_kelas_guru: string
-  kelas: {
-    tingkat: number | null
-    nama_kelas: string | null
-  } | null
-  mapel: {
-    nama_mapel: string | null
-  } | null
+  kelas: Kelas | Kelas[] | null
+  mapel: Mapel | Mapel[] | null
 }
 
 type Tugas = {
@@ -34,7 +42,7 @@ type Tugas = {
   tipe_tugas: string | null
   status: string | null
   created_at: string | null
-  mapel_kelas_guru: Mengajar | null
+  mapel_kelas_guru: Mengajar | Mengajar[] | null
 }
 
 type TugasSiswa = {
@@ -46,9 +54,7 @@ type TugasSiswa = {
   selesai_at: string | null
   jawaban: string | null
   file_url: string | null
-  siswa: {
-    nama_lengkap: string | null
-  } | null
+  siswa: SiswaRelasi | SiswaRelasi[] | null
 }
 
 type TugasView = Tugas & {
@@ -56,6 +62,25 @@ type TugasView = Tugas & {
   totalMengumpulkan: number
   totalDinilai: number
   rataRata: number
+}
+
+type JawabanHitungUlang = {
+  id_jawaban: string
+  id_soal: string
+  id_opsi: string | null
+  opsi_jawaban:
+    | {
+        is_benar: boolean | null
+      }
+    | {
+        is_benar: boolean | null
+      }[]
+    | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 export default function GuruNilaiPage() {
@@ -129,7 +154,9 @@ export default function GuruNilaiPage() {
       return
     }
 
-    const daftarMengajar = (mengajarData ?? []) as Mengajar[]
+    const daftarMengajar =
+      (mengajarData ?? []) as unknown as Mengajar[]
+
     setMengajarList(daftarMengajar)
 
     const defaultMengajar =
@@ -180,7 +207,7 @@ export default function GuruNilaiPage() {
       return
     }
 
-    const tugas = (tugasData ?? []) as Tugas[]
+    const tugas = (tugasData ?? []) as unknown as Tugas[]
 
     const { data: mengajarDetail } = await supabase
       .from("mapel_kelas_guru")
@@ -272,7 +299,7 @@ export default function GuruNilaiPage() {
       return
     }
 
-    setJawabanList((data ?? []) as TugasSiswa[])
+    setJawabanList((data ?? []) as unknown as TugasSiswa[])
   }
 
   useEffect(() => {
@@ -322,18 +349,18 @@ export default function GuruNilaiPage() {
         `)
         .eq("id_tugas_siswa", siswa.id_tugas_siswa)
 
+      const jawabanList =
+        (jawaban ?? []) as unknown as JawabanHitungUlang[]
+
       let totalBenar = 0
       let totalBobot = 0
 
-      for (const item of jawaban ?? []) {
+      for (const item of jawabanList) {
         const bobot =
           tugasSoal?.find((s) => s.id_soal === item.id_soal)?.bobot ?? 1
 
-        const benar =
-          Array.isArray(item.opsi_jawaban)
-            ? item.opsi_jawaban[0]?.is_benar === true
-            : item.opsi_jawaban?.is_benar === true
-
+        const opsi = firstItem(item.opsi_jawaban)
+        const benar = opsi?.is_benar === true
         const nilaiItem = benar ? Number(bobot) : 0
 
         totalBenar += nilaiItem
@@ -369,10 +396,11 @@ export default function GuruNilaiPage() {
 
   const filteredJawaban = jawabanList.filter((item) => {
     const keyword = search.toLowerCase()
+    const siswa = firstItem(item.siswa)
 
     return (
       String(item.nisn).toLowerCase().includes(keyword) ||
-      String(item.siswa?.nama_lengkap ?? "").toLowerCase().includes(keyword) ||
+      String(siswa?.nama_lengkap ?? "").toLowerCase().includes(keyword) ||
       String(item.status ?? "").toLowerCase().includes(keyword)
     )
   })
@@ -392,6 +420,15 @@ export default function GuruNilaiPage() {
     if (tipe === "upload_file") return "Upload File"
     if (tipe === "essay") return "Essay"
     return "-"
+  }
+
+  const getMengajarLabel = (item: Mengajar) => {
+    const mapel = firstItem(item.mapel)
+    const kelas = firstItem(item.kelas)
+
+    return `${mapel?.nama_mapel ?? "-"} - Kelas ${
+      kelas?.tingkat ?? "-"
+    } ${kelas?.nama_kelas ?? "-"}`
   }
 
   if (loading) {
@@ -427,8 +464,7 @@ export default function GuruNilaiPage() {
               key={item.id_mapel_kelas_guru}
               value={item.id_mapel_kelas_guru}
             >
-              {item.mapel?.nama_mapel ?? "-"} - Kelas{" "}
-              {item.kelas?.tingkat} {item.kelas?.nama_kelas}
+              {getMengajarLabel(item)}
             </option>
           ))}
         </select>
@@ -574,40 +610,44 @@ export default function GuruNilaiPage() {
                           </td>
                         </tr>
                       ) : (
-                        filteredJawaban.map((item, index) => (
-                          <tr
-                            key={item.id_tugas_siswa}
-                            className="border-b dark:border-slate-800"
-                          >
-                            <td className="py-3 pr-4">{index + 1}</td>
-                            <td className="py-3 pr-4">
-                              <p className="font-medium">
-                                {item.siswa?.nama_lengkap ?? "-"}
-                              </p>
-                              <p className="text-xs text-slate-500">
-                                {item.nisn}
-                              </p>
-                            </td>
-                            <td className="py-3 pr-4 capitalize">
-                              {item.status ?? "-"}
-                            </td>
-                            <td className="py-3 pr-4">
-                              {formatTanggal(item.selesai_at)}
-                            </td>
-                            <td className="py-3 pr-4">
-                              {item.nilai ?? "-"}
-                            </td>
-                            <td className="py-3 pr-4">
-                              <Link
-                                href={`/guru/nilai/${item.id_tugas_siswa}`}
-                                className="inline-flex items-center gap-2 rounded-lg bg-blue-100 px-3 py-2 text-blue-700 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300"
-                              >
-                                <Eye size={16} />
-                                Lihat
-                              </Link>
-                            </td>
-                          </tr>
-                        ))
+                        filteredJawaban.map((item, index) => {
+                          const siswa = firstItem(item.siswa)
+
+                          return (
+                            <tr
+                              key={item.id_tugas_siswa}
+                              className="border-b dark:border-slate-800"
+                            >
+                              <td className="py-3 pr-4">{index + 1}</td>
+                              <td className="py-3 pr-4">
+                                <p className="font-medium">
+                                  {siswa?.nama_lengkap ?? "-"}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {item.nisn}
+                                </p>
+                              </td>
+                              <td className="py-3 pr-4 capitalize">
+                                {item.status ?? "-"}
+                              </td>
+                              <td className="py-3 pr-4">
+                                {formatTanggal(item.selesai_at)}
+                              </td>
+                              <td className="py-3 pr-4">
+                                {item.nilai ?? "-"}
+                              </td>
+                              <td className="py-3 pr-4">
+                                <Link
+                                  href={`/guru/nilai/${item.id_tugas_siswa}`}
+                                  className="inline-flex items-center gap-2 rounded-lg bg-blue-100 px-3 py-2 text-blue-700 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-300"
+                                >
+                                  <Eye size={16} />
+                                  Lihat
+                                </Link>
+                              </td>
+                            </tr>
+                          )
+                        })
                       )}
                     </tbody>
                   </table>

@@ -2,8 +2,43 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { ArrowLeft, Save, ExternalLink, CheckCircle2, XCircle } from "lucide-react"
+import {
+  ArrowLeft,
+  Save,
+  ExternalLink,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react"
 import { supabase } from "@/lib/supabase"
+
+type SiswaRelasi = {
+  nama_lengkap: string | null
+}
+
+type MapelRelasi = {
+  nama_mapel: string | null
+}
+
+type KelasRelasi = {
+  tingkat: number | null
+  nama_kelas: string | null
+}
+
+type MapelKelasGuruRelasi = {
+  uid_guru: number | null
+  mapel: MapelRelasi | MapelRelasi[] | null
+  kelas: KelasRelasi | KelasRelasi[] | null
+}
+
+type TugasRelasi = {
+  judul: string
+  deskripsi: string | null
+  tipe_tugas: string | null
+  mapel_kelas_guru:
+    | MapelKelasGuruRelasi
+    | MapelKelasGuruRelasi[]
+    | null
+}
 
 type DetailJawaban = {
   id_tugas_siswa: string
@@ -15,24 +50,20 @@ type DetailJawaban = {
   jawaban: string | null
   file_url: string | null
   catatan_guru: string | null
-  siswa: {
-    nama_lengkap: string | null
-  } | null
-  tugas: {
-    judul: string
-    deskripsi: string | null
-    tipe_tugas: string | null
-    mapel_kelas_guru: {
-      uid_guru: number | null
-      mapel: {
-        nama_mapel: string | null
-      } | null
-      kelas: {
-        tingkat: number | null
-        nama_kelas: string | null
-      } | null
-    } | null
-  } | null
+  siswa: SiswaRelasi | SiswaRelasi[] | null
+  tugas: TugasRelasi | TugasRelasi[] | null
+}
+
+type BankSoalRelasi = {
+  pertanyaan: string
+  gambar_url: string | null
+  audio_url: string | null
+}
+
+type OpsiRelasi = {
+  label: string
+  isi_opsi: string
+  gambar_url: string | null
 }
 
 type JawabanPG = {
@@ -41,16 +72,13 @@ type JawabanPG = {
   id_opsi: string | null
   is_benar: boolean | null
   nilai: number | null
-  bank_soal: {
-    pertanyaan: string
-    gambar_url: string | null
-    audio_url: string | null
-  } | null
-  opsi_jawaban: {
-    label: string
-    isi_opsi: string
-    gambar_url: string | null
-  } | null
+  bank_soal: BankSoalRelasi | BankSoalRelasi[] | null
+  opsi_jawaban: OpsiRelasi | OpsiRelasi[] | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 export default function DetailNilaiGuruPage() {
@@ -86,6 +114,11 @@ export default function DetailNilaiGuruPage() {
 
       if (!profile || profile.role !== "guru") {
         router.push("/")
+        return
+      }
+
+      if (!profile.uid_guru) {
+        router.push("/verifikasi-guru")
         return
       }
 
@@ -129,19 +162,26 @@ export default function DetailNilaiGuruPage() {
         return
       }
 
-      const hasil = data as DetailJawaban
+      const hasil = data as unknown as DetailJawaban
 
-      if (hasil.tugas?.mapel_kelas_guru?.uid_guru !== profile.uid_guru) {
+      const tugas = firstItem(hasil.tugas)
+      const mapelKelasGuru = firstItem(tugas?.mapel_kelas_guru)
+
+      if (Number(mapelKelasGuru?.uid_guru) !== Number(profile.uid_guru)) {
         alert("Anda tidak memiliki akses ke data ini")
         router.push("/guru/nilai")
         return
       }
 
       setDetail(hasil)
-      setNilai(hasil.nilai !== null && hasil.nilai !== undefined ? String(hasil.nilai) : "")
+      setNilai(
+        hasil.nilai !== null && hasil.nilai !== undefined
+          ? String(hasil.nilai)
+          : ""
+      )
       setCatatanGuru(hasil.catatan_guru ?? "")
 
-      if (hasil.tugas?.tipe_tugas === "pilihan_ganda") {
+      if (tugas?.tipe_tugas === "pilihan_ganda") {
         const { data: pgData, error: pgError } = await supabase
           .from("jawaban_tugas_siswa")
           .select(`
@@ -169,7 +209,7 @@ export default function DetailNilaiGuruPage() {
           return
         }
 
-        setJawabanPG((pgData ?? []) as JawabanPG[])
+        setJawabanPG((pgData ?? []) as unknown as JawabanPG[])
       }
 
       setLoading(false)
@@ -228,7 +268,12 @@ export default function DetailNilaiGuruPage() {
     )
   }
 
-  const tipeTugas = detail?.tugas?.tipe_tugas
+  const tugas = firstItem(detail?.tugas)
+  const siswa = firstItem(detail?.siswa)
+  const mapelKelasGuru = firstItem(tugas?.mapel_kelas_guru)
+  const mapel = firstItem(mapelKelasGuru?.mapel)
+  const kelas = firstItem(mapelKelasGuru?.kelas)
+  const tipeTugas = tugas?.tipe_tugas
 
   return (
     <div className="space-y-6">
@@ -243,23 +288,25 @@ export default function DetailNilaiGuruPage() {
 
       <div className="rounded-2xl border bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <p className="text-sm text-blue-600 dark:text-blue-400">
-          {detail?.tugas?.mapel_kelas_guru?.mapel?.nama_mapel ?? "-"} • Kelas{" "}
-          {detail?.tugas?.mapel_kelas_guru?.kelas?.tingkat}{" "}
-          {detail?.tugas?.mapel_kelas_guru?.kelas?.nama_kelas}
+          {mapel?.nama_mapel ?? "-"} • Kelas {kelas?.tingkat ?? "-"}{" "}
+          {kelas?.nama_kelas ?? "-"}
         </p>
 
         <h1 className="mt-2 text-2xl font-bold">
-          {detail?.tugas?.judul}
+          {tugas?.judul ?? "-"}
         </h1>
 
         <p className="mt-2 text-slate-500 dark:text-slate-400">
-          {detail?.tugas?.deskripsi || "Tidak ada deskripsi."}
+          {tugas?.deskripsi || "Tidak ada deskripsi."}
         </p>
 
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
-          <Info label="Siswa" value={detail?.siswa?.nama_lengkap ?? "-"} />
+          <Info label="Siswa" value={siswa?.nama_lengkap ?? "-"} />
           <Info label="NISN" value={detail?.nisn ?? "-"} />
-          <Info label="Dikumpulkan" value={formatTanggal(detail?.selesai_at ?? null)} />
+          <Info
+            label="Dikumpulkan"
+            value={formatTanggal(detail?.selesai_at ?? null)}
+          />
         </div>
       </div>
 
@@ -305,65 +352,70 @@ export default function DetailNilaiGuruPage() {
                 Belum ada jawaban pilihan ganda.
               </p>
             ) : (
-              jawabanPG.map((item, index) => (
-                <div
-                  key={item.id_jawaban}
-                  className="rounded-xl border p-4 dark:border-slate-800"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm text-slate-500">
-                        Soal {index + 1}
-                      </p>
+              jawabanPG.map((item, index) => {
+                const soal = firstItem(item.bank_soal)
+                const opsi = firstItem(item.opsi_jawaban)
 
-                      <p className="mt-1 font-semibold">
-                        {item.bank_soal?.pertanyaan ?? "-"}
-                      </p>
+                return (
+                  <div
+                    key={item.id_jawaban}
+                    className="rounded-xl border p-4 dark:border-slate-800"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm text-slate-500">
+                          Soal {index + 1}
+                        </p>
+
+                        <p className="mt-1 font-semibold">
+                          {soal?.pertanyaan ?? "-"}
+                        </p>
+                      </div>
+
+                      <div
+                        className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
+                          item.is_benar
+                            ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+                            : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                        }`}
+                      >
+                        {item.is_benar ? (
+                          <CheckCircle2 size={14} />
+                        ) : (
+                          <XCircle size={14} />
+                        )}
+                        {item.is_benar ? "Benar" : "Salah"}
+                      </div>
                     </div>
 
-                    <div
-                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium ${
-                        item.is_benar
-                          ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
-                          : "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
-                      }`}
-                    >
-                      {item.is_benar ? (
-                        <CheckCircle2 size={14} />
-                      ) : (
-                        <XCircle size={14} />
-                      )}
-                      {item.is_benar ? "Benar" : "Salah"}
+                    {soal?.gambar_url && (
+                      <img
+                        src={soal.gambar_url}
+                        alt="Gambar soal"
+                        className="mt-3 max-h-60 rounded-xl border object-contain"
+                      />
+                    )}
+
+                    {soal?.audio_url && (
+                      <audio controls className="mt-3 w-full">
+                        <source src={soal.audio_url} />
+                      </audio>
+                    )}
+
+                    <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-950">
+                      <p>
+                        <b>Jawaban siswa:</b>{" "}
+                        {opsi
+                          ? `${opsi.label}. ${opsi.isi_opsi}`
+                          : "Opsi sudah berubah/dihapus"}
+                      </p>
+                      <p className="mt-1">
+                        <b>Nilai soal:</b> {item.nilai ?? 0}
+                      </p>
                     </div>
                   </div>
-
-                  {item.bank_soal?.gambar_url && (
-                    <img
-                      src={item.bank_soal.gambar_url}
-                      alt="Gambar soal"
-                      className="mt-3 max-h-60 rounded-xl border object-contain"
-                    />
-                  )}
-
-                  {item.bank_soal?.audio_url && (
-                    <audio controls className="mt-3 w-full">
-                      <source src={item.bank_soal.audio_url} />
-                    </audio>
-                  )}
-
-                  <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-950">
-                    <p>
-                      <b>Jawaban siswa:</b>{" "}
-                      {item.opsi_jawaban
-                        ? `${item.opsi_jawaban.label}. ${item.opsi_jawaban.isi_opsi}`
-                        : "Opsi sudah berubah/dihapus"}
-                    </p>
-                    <p className="mt-1">
-                      <b>Nilai soal:</b> {item.nilai ?? 0}
-                    </p>
-                  </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { Pencil, Trash2, Image, Volume2 } from "lucide-react"
-import type { BankSoal } from "../page"
+import type { BankSoal, Mapel } from "../page"
 
 type Props = {
   data: BankSoal[]
@@ -9,6 +9,11 @@ type Props = {
   itemsPerPage: number
   onEdit: (soal: BankSoal) => void
   onDelete: (id: string) => void
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 export default function SoalTable({
@@ -41,88 +46,94 @@ export default function SoalTable({
               </td>
             </tr>
           ) : (
-            data.map((item, index) => (
-              <tr
-                key={item.id_soal}
-                className="border-b dark:border-slate-800"
-              >
-                <td className="py-3 pr-4">
-                  {(page - 1) * itemsPerPage + index + 1}
-                </td>
+            data.map((item, index) => {
+              const mapel = firstItem<Mapel>(item.mapel)
 
-                <td className="min-w-72 py-3 pr-4">
-                  <p className="line-clamp-2 font-medium">
-                    {item.pertanyaan}
-                  </p>
+              return (
+                <tr
+                  key={item.id_soal}
+                  className="border-b dark:border-slate-800"
+                >
+                  <td className="py-3 pr-4">
+                    {(page - 1) * itemsPerPage + index + 1}
+                  </td>
 
-                  <p className="mt-1 text-xs text-slate-500">
-                    Opsi: {item.opsi_jawaban?.length ?? 0}
-                  </p>
-                </td>
+                  <td className="min-w-72 py-3 pr-4">
+                    <p className="line-clamp-2 font-medium">
+                      {item.pertanyaan}
+                    </p>
 
-                <td className="py-3 pr-4">
-                  {item.mapel?.nama_mapel ?? "-"}
-                </td>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Opsi: {item.opsi_jawaban?.length ?? 0}
+                    </p>
+                  </td>
 
-                <td className="py-3 pr-4 uppercase">
-                  {item.tipe_soal ?? "-"}
-                </td>
+                  <td className="py-3 pr-4">
+                    {mapel?.nama_mapel ?? "-"}
+                  </td>
 
-                <td className="py-3 pr-4 capitalize">
-                  {item.tingkat_kesulitan ?? "-"}
-                </td>
+                  <td className="py-3 pr-4 uppercase">
+                    {item.tipe_soal ?? "-"}
+                  </td>
 
-                <td className="py-3 pr-4">
-                  <div className="flex gap-2">
-                    {item.gambar_url && (
-                      <a
-                        href={item.gambar_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-lg bg-blue-100 p-2 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
-                        title="Lihat gambar"
+                  <td className="py-3 pr-4 capitalize">
+                    {item.tingkat_kesulitan ?? "-"}
+                  </td>
+
+                  <td className="py-3 pr-4">
+                    <div className="flex gap-2">
+                      {item.gambar_url && (
+                        <a
+                          href={item.gambar_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg bg-blue-100 p-2 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                          title="Lihat gambar"
+                        >
+                          <Image size={16} />
+                        </a>
+                      )}
+
+                      {item.audio_url && (
+                        <a
+                          href={item.audio_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg bg-purple-100 p-2 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
+                          title="Dengar audio"
+                        >
+                          <Volume2 size={16} />
+                        </a>
+                      )}
+
+                      {!item.gambar_url && !item.audio_url && (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </div>
+                  </td>
+
+                  <td className="py-3 pr-4">
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onEdit(item)}
+                        className="rounded-lg bg-yellow-100 p-2 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-950 dark:text-yellow-300"
                       >
-                        <Image size={16} />
-                      </a>
-                    )}
+                        <Pencil size={16} />
+                      </button>
 
-                    {item.audio_url && (
-                      <a
-                        href={item.audio_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-lg bg-purple-100 p-2 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
-                        title="Dengar audio"
+                      <button
+                        type="button"
+                        onClick={() => onDelete(item.id_soal)}
+                        className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300"
                       >
-                        <Volume2 size={16} />
-                      </a>
-                    )}
-
-                    {!item.gambar_url && !item.audio_url && "-"}
-                  </div>
-                </td>
-
-                <td className="py-3 pr-4">
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => onEdit(item)}
-                      className="rounded-lg bg-yellow-100 p-2 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-950 dark:text-yellow-300"
-                    >
-                      <Pencil size={16} />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => onDelete(item.id_soal)}
-                      className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })
           )}
         </tbody>
       </table>

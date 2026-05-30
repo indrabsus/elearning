@@ -2,13 +2,22 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import {
-  ArrowLeft,
-  CheckCircle2,
-  FileUp,
-  Save,
-} from "lucide-react"
+import { ArrowLeft, FileUp, Save } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+
+type Mapel = {
+  nama_mapel: string | null
+}
+
+type Kelas = {
+  tingkat: number | null
+  nama_kelas: string | null
+}
+
+type MapelKelasGuru = {
+  mapel: Mapel | Mapel[] | null
+  kelas: Kelas | Kelas[] | null
+}
 
 type Tugas = {
   id_tugas: string
@@ -18,15 +27,7 @@ type Tugas = {
   deadline: string | null
   status: string | null
   tipe_tugas: string | null
-  mapel_kelas_guru: {
-    mapel: {
-      nama_mapel: string | null
-    } | null
-    kelas: {
-      tingkat: number | null
-      nama_kelas: string | null
-    } | null
-  } | null
+  mapel_kelas_guru: MapelKelasGuru | MapelKelasGuru[] | null
 }
 
 type TugasSiswa = {
@@ -50,31 +51,41 @@ type Opsi = {
   gambar_url: string | null
 }
 
+type BankSoalRelasi = {
+  id_soal: string
+  pertanyaan: string
+  gambar_url: string | null
+  audio_url: string | null
+  pembahasan: string | null
+  opsi_jawaban: Opsi[]
+}
+
 type SoalPG = {
   id_tugas_soal: string
   nomor: number
   bobot: number | null
-  bank_soal: {
-    id_soal: string
-    pertanyaan: string
-    gambar_url: string | null
-    audio_url: string | null
-    pembahasan: string | null
-    opsi_jawaban: Opsi[]
-  } | null
+  bank_soal: BankSoalRelasi | BankSoalRelasi[] | null
+}
+
+type JawabanLama = {
+  id_soal: string | null
+  id_opsi: string | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 export default function KerjakanTugasPage() {
   const router = useRouter()
   const params = useParams()
   const idTugas = params.id as string
-
-const hasLoaded = useRef(false)
+  const hasLoaded = useRef(false)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const [nisn, setNisn] = useState("")
   const [tugas, setTugas] = useState<Tugas | null>(null)
   const [tugasSiswa, setTugasSiswa] = useState<TugasSiswa | null>(null)
 
@@ -110,8 +121,6 @@ const hasLoaded = useRef(false)
       return
     }
 
-    setNisn(profile.nisn)
-
     const { data: tugasData, error: tugasError } = await supabase
       .from("tugas")
       .select(`
@@ -141,7 +150,7 @@ const hasLoaded = useRef(false)
       return
     }
 
-    const tugasFinal = tugasData as Tugas
+    const tugasFinal = tugasData as unknown as Tugas
     setTugas(tugasFinal)
 
     const { data: existing } = await supabase
@@ -161,73 +170,74 @@ const hasLoaded = useRef(false)
       .eq("nisn", profile.nisn)
       .maybeSingle()
 
+    let dataTugasSiswa: TugasSiswa | null = null
+
     if (existing) {
-  setTugasSiswa(existing as TugasSiswa)
-  setJawabanEssay(existing.jawaban ?? "")
-  setFileUrl(existing.file_url ?? "")
+      dataTugasSiswa = existing as TugasSiswa
+      setTugasSiswa(dataTugasSiswa)
+      setJawabanEssay(dataTugasSiswa.jawaban ?? "")
+      setFileUrl(dataTugasSiswa.file_url ?? "")
+    } else {
+      const { data: baru, error: insertError } = await supabase
+        .from("tugas_siswa")
+        .upsert(
+          {
+            id_tugas: idTugas,
+            nisn: profile.nisn,
+            status: "dikerjakan",
+            mulai_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "id_tugas,nisn",
+          }
+        )
+        .select(`
+          id_tugas_siswa,
+          id_tugas,
+          nisn,
+          status,
+          mulai_at,
+          selesai_at,
+          nilai,
+          jawaban,
+          file_url
+        `)
+        .single()
 
-  if (tugasFinal.tipe_tugas === "pilihan_ganda") {
-    const { data: jawabanLama, error: jawabanError } = await supabase
-      .from("jawaban_tugas_siswa")
-      .select(`
-        id_soal,
-        id_opsi
-      `)
-      .eq("id_tugas_siswa", existing.id_tugas_siswa)
+      if (insertError || !baru) {
+        alert(insertError?.message || "Gagal membuat data tugas siswa")
+        setLoading(false)
+        return
+      }
 
-    if (jawabanError) {
-      alert(jawabanError.message)
-      setLoading(false)
-      return
+      dataTugasSiswa = baru as TugasSiswa
+      setTugasSiswa(dataTugasSiswa)
     }
 
-    const selected: Record<string, string> = {}
-
-    ;(jawabanLama ?? []).forEach((item) => {
-      if (item.id_soal && item.id_opsi) {
-        selected[item.id_soal] = item.id_opsi
-      }
-    })
-
-    setJawabanPG(selected)
-  }
-} else {
-  const { data: baru, error: insertError } = await supabase
-    .from("tugas_siswa")
-    .upsert(
-      {
-        id_tugas: idTugas,
-        nisn: profile.nisn,
-        status: "dikerjakan",
-        mulai_at: new Date().toISOString(),
-      },
-      {
-        onConflict: "id_tugas,nisn",
-      }
-    )
-    .select(`
-      id_tugas_siswa,
-      id_tugas,
-      nisn,
-      status,
-      mulai_at,
-      selesai_at,
-      nilai,
-      jawaban,
-      file_url
-    `)
-    .single()
-
-  if (insertError || !baru) {
-    alert(insertError?.message || "Gagal membuat data tugas siswa")
-    setLoading(false)
-    return
-  }
-
-  setTugasSiswa(baru as TugasSiswa)
-}
-
     if (tugasFinal.tipe_tugas === "pilihan_ganda") {
+      if (dataTugasSiswa) {
+        const { data: jawabanLama, error: jawabanError } = await supabase
+          .from("jawaban_tugas_siswa")
+          .select("id_soal, id_opsi")
+          .eq("id_tugas_siswa", dataTugasSiswa.id_tugas_siswa)
+
+        if (jawabanError) {
+          alert(jawabanError.message)
+          setLoading(false)
+          return
+        }
+
+        const selected: Record<string, string> = {}
+
+        ;((jawabanLama ?? []) as JawabanLama[]).forEach((item) => {
+          if (item.id_soal && item.id_opsi) {
+            selected[item.id_soal] = item.id_opsi
+          }
+        })
+
+        setJawabanPG(selected)
+      }
+
       const { data: soalData, error: soalError } = await supabase
         .from("tugas_soal")
         .select(`
@@ -259,18 +269,17 @@ const hasLoaded = useRef(false)
         return
       }
 
-      setSoalPG((soalData ?? []) as SoalPG[])
+      setSoalPG((soalData ?? []) as unknown as SoalPG[])
     }
 
     setLoading(false)
   }
 
   useEffect(() => {
-  if (hasLoaded.current) return
-
-  hasLoaded.current = true
-  loadData()
-}, [])
+    if (hasLoaded.current) return
+    hasLoaded.current = true
+    loadData()
+  }, [])
 
   const uploadFile = async (file: File) => {
     const ext = file.name.split(".").pop()
@@ -369,29 +378,45 @@ const hasLoaded = useRef(false)
 
     setSaving(true)
 
-    await supabase
+    const { error: deleteError } = await supabase
       .from("jawaban_tugas_siswa")
       .delete()
       .eq("id_tugas_siswa", tugasSiswa.id_tugas_siswa)
 
-    const jawabanInsert = soalPG.map((item) => {
-      const soal = item.bank_soal
-      const idOpsiDipilih = jawabanPG[soal?.id_soal ?? ""]
-      const opsiDipilih = soal?.opsi_jawaban.find(
-        (opsi) => opsi.id_opsi === idOpsiDipilih
-      )
+    if (deleteError) {
+      alert(deleteError.message)
+      setSaving(false)
+      return
+    }
 
-      const benar = opsiDipilih?.is_benar === true
-      const bobot = Number(item.bobot ?? 1)
+    const jawabanInsert = soalPG
+      .map((item) => {
+        const soal = firstItem(item.bank_soal)
+        if (!soal) return null
 
-      return {
-        id_tugas_siswa: tugasSiswa.id_tugas_siswa,
-        id_soal: soal?.id_soal,
-        id_opsi: idOpsiDipilih,
-        is_benar: benar,
-        nilai: benar ? bobot : 0,
-      }
-    })
+        const idOpsiDipilih = jawabanPG[soal.id_soal]
+        const opsiDipilih = soal.opsi_jawaban.find(
+          (opsi) => opsi.id_opsi === idOpsiDipilih
+        )
+
+        const benar = opsiDipilih?.is_benar === true
+        const bobot = Number(item.bobot ?? 1)
+
+        return {
+          id_tugas_siswa: tugasSiswa.id_tugas_siswa,
+          id_soal: soal.id_soal,
+          id_opsi: idOpsiDipilih,
+          is_benar: benar,
+          nilai: benar ? bobot : 0,
+        }
+      })
+      .filter(Boolean) as {
+      id_tugas_siswa: string
+      id_soal: string
+      id_opsi: string
+      is_benar: boolean
+      nilai: number
+    }[]
 
     const totalNilaiBenar = jawabanInsert.reduce(
       (total, item) => total + Number(item.nilai ?? 0),
@@ -465,7 +490,11 @@ const hasLoaded = useRef(false)
     )
   }
 
-  const sudahSelesai = tugasSiswa?.status === "selesai"
+  const sudahSelesai =
+    tugasSiswa?.status === "selesai" || tugasSiswa?.status === "dinilai"
+
+  const relasiMengajar = firstItem(tugas?.mapel_kelas_guru)
+  const mapel = firstItem(relasiMengajar?.mapel)
 
   return (
     <div className="space-y-6">
@@ -480,12 +509,10 @@ const hasLoaded = useRef(false)
 
       <div className="rounded-2xl border bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <p className="text-sm text-blue-600 dark:text-blue-400">
-          {tugas?.mapel_kelas_guru?.mapel?.nama_mapel ?? "-"}
+          {mapel?.nama_mapel ?? "-"}
         </p>
 
-        <h1 className="mt-2 text-2xl font-bold">
-          {tugas?.judul}
-        </h1>
+        <h1 className="mt-2 text-2xl font-bold">{tugas?.judul}</h1>
 
         <p className="mt-3 text-slate-500 dark:text-slate-400">
           {tugas?.deskripsi || "Tidak ada deskripsi."}
@@ -506,12 +533,11 @@ const hasLoaded = useRef(false)
             </span>
           )}
 
-          {tugasSiswa?.nilai !== null &&
-            tugasSiswa?.nilai !== undefined && (
-              <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                Nilai: {tugasSiswa.nilai}
-              </span>
-            )}
+          {tugasSiswa?.nilai !== null && tugasSiswa?.nilai !== undefined && (
+            <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+              Nilai: {tugasSiswa.nilai}
+            </span>
+          )}
         </div>
       </div>
 
@@ -599,11 +625,11 @@ const hasLoaded = useRef(false)
             </div>
           ) : (
             soalPG.map((item) => {
-              const soal = item.bank_soal
+              const soal = firstItem(item.bank_soal)
               if (!soal) return null
 
-              const opsiList = [...(soal.opsi_jawaban ?? [])].sort(
-                (a, b) => a.label.localeCompare(b.label)
+              const opsiList = [...(soal.opsi_jawaban ?? [])].sort((a, b) =>
+                a.label.localeCompare(b.label)
               )
 
               return (
@@ -635,72 +661,73 @@ const hasLoaded = useRef(false)
 
                   <div className="mt-5 space-y-3">
                     {opsiList.map((opsi) => {
-                      const selected = jawabanPG[soal.id_soal] === opsi.id_opsi
-const benar = opsi.is_benar === true
-const salahDipilih = sudahSelesai && selected && !benar
+                      const selected =
+                        jawabanPG[soal.id_soal] === opsi.id_opsi
+                      const benar = opsi.is_benar === true
+                      const salahDipilih = sudahSelesai && selected && !benar
 
-const warnaOpsi = sudahSelesai
-  ? benar
-    ? "border-green-600 bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
-    : salahDipilih
-    ? "border-red-600 bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
-    : "hover:bg-slate-50 dark:hover:bg-slate-800"
-  : selected
-  ? "border-blue-600 bg-blue-50 dark:bg-blue-950"
-  : "hover:bg-slate-50 dark:hover:bg-slate-800"
+                      const warnaOpsi = sudahSelesai
+                        ? benar
+                          ? "border-green-600 bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300"
+                          : salahDipilih
+                          ? "border-red-600 bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300"
+                          : "hover:bg-slate-50 dark:hover:bg-slate-800"
+                        : selected
+                        ? "border-blue-600 bg-blue-50 dark:bg-blue-950"
+                        : "hover:bg-slate-50 dark:hover:bg-slate-800"
 
                       return (
                         <button
-  key={opsi.id_opsi}
-  type="button"
-  disabled={sudahSelesai}
-  onClick={() => pilihOpsi(soal.id_soal, opsi.id_opsi)}
-  className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition dark:border-slate-700 ${warnaOpsi}`}
->
-  <span
-    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
-      sudahSelesai && benar
-        ? "border-green-600 bg-green-600 text-white"
-        : sudahSelesai && salahDipilih
-        ? "border-red-600 bg-red-600 text-white"
-        : selected
-        ? "border-blue-600 bg-blue-600 text-white"
-        : "border-slate-300 dark:border-slate-700"
-    }`}
-  >
-    {sudahSelesai && benar
-      ? "✓"
-      : sudahSelesai && salahDipilih
-      ? "✕"
-      : selected
-      ? "✓"
-      : opsi.label}
-  </span>
+                          key={opsi.id_opsi}
+                          type="button"
+                          disabled={sudahSelesai}
+                          onClick={() => pilihOpsi(soal.id_soal, opsi.id_opsi)}
+                          className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition dark:border-slate-700 ${warnaOpsi}`}
+                        >
+                          <span
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
+                              sudahSelesai && benar
+                                ? "border-green-600 bg-green-600 text-white"
+                                : sudahSelesai && salahDipilih
+                                ? "border-red-600 bg-red-600 text-white"
+                                : selected
+                                ? "border-blue-600 bg-blue-600 text-white"
+                                : "border-slate-300 dark:border-slate-700"
+                            }`}
+                          >
+                            {sudahSelesai && benar
+                              ? "✓"
+                              : sudahSelesai && salahDipilih
+                              ? "✕"
+                              : selected
+                              ? "✓"
+                              : opsi.label}
+                          </span>
 
-  <span className="flex-1">
-    <span>{opsi.isi_opsi}</span>
+                          <span className="flex-1">
+                            <span>{opsi.isi_opsi}</span>
 
-    {opsi.gambar_url && (
-      <img
-        src={opsi.gambar_url}
-        alt={`Opsi ${opsi.label}`}
-        className="mt-3 max-h-40 rounded-lg border object-contain"
-      />
-    )}
+                            {opsi.gambar_url && (
+                              <img
+                                src={opsi.gambar_url}
+                                alt={`Opsi ${opsi.label}`}
+                                className="mt-3 max-h-40 rounded-lg border object-contain"
+                              />
+                            )}
 
-    {sudahSelesai && benar && (
-      <p className="mt-2 text-xs font-semibold text-green-600 dark:text-green-300">
-        Jawaban benar
-      </p>
-    )}
+                            {sudahSelesai && benar && (
+                              <p className="mt-2 text-xs font-semibold text-green-600 dark:text-green-300">
+                                Jawaban benar
+                              </p>
+                            )}
 
-    {sudahSelesai && salahDipilih && (
-      <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-300">
-        Jawaban kamu
-      </p>
-    )}
-  </span>
-</button>
+                            {sudahSelesai && salahDipilih && (
+                              <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-300">
+                                Jawaban kamu
+                              </p>
+                            )}
+                          </span>
+                        </button>
                       )
                     })}
                   </div>

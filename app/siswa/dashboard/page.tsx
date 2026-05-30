@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { BookOpen, FileText, GraduationCap, Activity } from "lucide-react"
+import {
+  BookOpen,
+  FileText,
+  GraduationCap,
+  Activity,
+} from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
 type Siswa = {
@@ -15,13 +20,44 @@ type Siswa = {
   tahun_masuk: number
 }
 
+type Kelas = {
+  tingkat: number | null
+  nama_kelas: string | null
+}
+
 type KelasAktif = {
   id_siswa_kelas: string
-  status: string
-  kelas: {
-    tingkat: number | null
-    nama_kelas: string | null
-  } | null
+  id_kelas: string
+  status: string | null
+  kelas: Kelas | Kelas[] | null
+}
+
+type Mapel = {
+  nama_mapel: string | null
+}
+
+type MapelKelasGuru = {
+  mapel: Mapel | Mapel[] | null
+}
+
+type MateriTerbaru = {
+  nama_materi: string | null
+  created_at: string | null
+  mapel_kelas_guru: MapelKelasGuru | MapelKelasGuru[] | null
+}
+
+type TugasTerbaru = {
+  id_tugas: string
+  judul: string | null
+  created_at: string | null
+  mapel_kelas_guru: MapelKelasGuru | MapelKelasGuru[] | null
+}
+
+type TugasSiswaData = {
+  id_tugas: string
+  status: string | null
+  selesai_at: string | null
+  nilai: number | null
 }
 
 type AktivitasItem = {
@@ -29,6 +65,11 @@ type AktivitasItem = {
   judul: string
   keterangan: string
   tanggal: string | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 export default function SiswaDashboardPage() {
@@ -82,7 +123,7 @@ export default function SiswaDashboardPage() {
         return
       }
 
-      const { data: siswaData } = await supabase
+      const { data: siswaData, error: siswaError } = await supabase
         .from("siswa")
         .select(`
           nisn,
@@ -96,42 +137,59 @@ export default function SiswaDashboardPage() {
         .eq("nisn", profile.nisn)
         .single()
 
-      if (!siswaData) {
+      if (siswaError || !siswaData) {
         router.push("/verifikasi-siswa")
         return
       }
 
-      setSiswa(siswaData)
+      setSiswa(siswaData as Siswa)
 
-      const { data: siswaKelasData } = await supabase
-        .from("siswa_kelas")
-        .select(`
-          id_siswa_kelas,
-          status,
-          id_kelas,
-          kelas:id_kelas (
-            tingkat,
-            nama_kelas
-          )
-        `)
-        .eq("nisn", profile.nisn)
-        .eq("id_tahun_ajaran", idTahunAjaran)
-        .maybeSingle()
+      const { data: siswaKelasData, error: siswaKelasError } =
+        await supabase
+          .from("siswa_kelas")
+          .select(`
+            id_siswa_kelas,
+            status,
+            id_kelas,
+            kelas:id_kelas (
+              tingkat,
+              nama_kelas
+            )
+          `)
+          .eq("nisn", profile.nisn)
+          .eq("id_tahun_ajaran", idTahunAjaran)
+          .maybeSingle()
+
+      if (siswaKelasError) {
+        alert(siswaKelasError.message)
+        setLoading(false)
+        return
+      }
 
       if (!siswaKelasData) {
         setLoading(false)
         return
       }
 
-      setKelasAktif(siswaKelasData as KelasAktif)
+      const kelasData =
+        siswaKelasData as unknown as KelasAktif
 
-      const idKelas = siswaKelasData.id_kelas
+      setKelasAktif(kelasData)
 
-      const { data: mengajarData } = await supabase
-        .from("mapel_kelas_guru")
-        .select("id_mapel_kelas_guru")
-        .eq("id_kelas", idKelas)
-        .eq("id_tahun_ajaran", idTahunAjaran)
+      const idKelas = kelasData.id_kelas
+
+      const { data: mengajarData, error: mengajarError } =
+        await supabase
+          .from("mapel_kelas_guru")
+          .select("id_mapel_kelas_guru")
+          .eq("id_kelas", idKelas)
+          .eq("id_tahun_ajaran", idTahunAjaran)
+
+      if (mengajarError) {
+        alert(mengajarError.message)
+        setLoading(false)
+        return
+      }
 
       const idMengajar =
         mengajarData?.map((item) => item.id_mapel_kelas_guru) ?? []
@@ -164,8 +222,8 @@ export default function SiswaDashboardPage() {
             .from("tugas_siswa")
             .select("*", { count: "exact", head: true })
             .eq("nisn", profile.nisn)
-            .eq("status", "selesai")
             .in("id_tugas", idsTugasAktif)
+            .in("status", ["selesai", "dinilai"])
 
           tugasDikerjakanCount = count ?? 0
         }
@@ -176,7 +234,7 @@ export default function SiswaDashboardPage() {
 
         const aktivitasBaru: AktivitasItem[] = []
 
-        const { data: materiTerbaru } = await supabase
+        const { data: materiTerbaruData } = await supabase
           .from("materi")
           .select(`
             nama_materi,
@@ -191,17 +249,22 @@ export default function SiswaDashboardPage() {
           .order("created_at", { ascending: false })
           .limit(5)
 
-        ;(materiTerbaru ?? []).forEach((item: any) => {
+        const materiTerbaru =
+          (materiTerbaruData ?? []) as unknown as MateriTerbaru[]
+
+        materiTerbaru.forEach((item) => {
+          const mengajar = firstItem(item.mapel_kelas_guru)
+          const mapel = firstItem(mengajar?.mapel)
+
           aktivitasBaru.push({
             tipe: "Materi",
             judul: item.nama_materi ?? "Materi baru",
-            keterangan:
-              item.mapel_kelas_guru?.mapel?.nama_mapel ?? "-",
+            keterangan: mapel?.nama_mapel ?? "-",
             tanggal: item.created_at,
           })
         })
 
-        const { data: tugasTerbaru } = await supabase
+        const { data: tugasTerbaruData } = await supabase
           .from("tugas")
           .select(`
             id_tugas,
@@ -218,10 +281,13 @@ export default function SiswaDashboardPage() {
           .order("created_at", { ascending: false })
           .limit(5)
 
-        const idsTugas =
-          tugasTerbaru?.map((item) => item.id_tugas) ?? []
+        const tugasTerbaru =
+          (tugasTerbaruData ?? []) as unknown as TugasTerbaru[]
 
-        let tugasSiswaData: any[] = []
+        const idsTugas =
+          tugasTerbaru.map((item) => item.id_tugas)
+
+        let tugasSiswaData: TugasSiswaData[] = []
 
         if (idsTugas.length > 0) {
           const { data } = await supabase
@@ -230,24 +296,27 @@ export default function SiswaDashboardPage() {
             .eq("nisn", profile.nisn)
             .in("id_tugas", idsTugas)
 
-          tugasSiswaData = data ?? []
+          tugasSiswaData = (data ?? []) as TugasSiswaData[]
         }
 
-        ;(tugasTerbaru ?? []).forEach((item: any) => {
+        tugasTerbaru.forEach((item) => {
+          const mengajar = firstItem(item.mapel_kelas_guru)
+          const mapel = firstItem(mengajar?.mapel)
+
           const pengerjaan = tugasSiswaData.find(
             (p) => p.id_tugas === item.id_tugas
           )
 
+          const sudahDikerjakan =
+            pengerjaan?.status === "selesai" ||
+            pengerjaan?.status === "dinilai"
+
           aktivitasBaru.push({
-            tipe:
-              pengerjaan?.status === "selesai"
-                ? "Tugas Selesai"
-                : "Tugas",
+            tipe: sudahDikerjakan ? "Tugas Selesai" : "Tugas",
             judul: item.judul ?? "Tugas baru",
-            keterangan:
-              pengerjaan?.status === "selesai"
-                ? `Sudah dikerjakan • Nilai: ${pengerjaan.nilai ?? "-"}`
-                : item.mapel_kelas_guru?.mapel?.nama_mapel ?? "-",
+            keterangan: sudahDikerjakan
+              ? `Sudah dikerjakan • Nilai: ${pengerjaan?.nilai ?? "-"}`
+              : mapel?.nama_mapel ?? "-",
             tanggal: pengerjaan?.selesai_at ?? item.created_at,
           })
         })
@@ -260,6 +329,11 @@ export default function SiswaDashboardPage() {
         })
 
         setAktivitas(aktivitasBaru.slice(0, 8))
+      } else {
+        setTotalMateri(0)
+        setTotalTugas(0)
+        setTugasDikerjakan(0)
+        setAktivitas([])
       }
 
       setLoading(false)
@@ -276,8 +350,10 @@ export default function SiswaDashboardPage() {
     )
   }
 
-  const kelasText = kelasAktif?.kelas
-    ? `${kelasAktif.kelas.tingkat} ${kelasAktif.kelas.nama_kelas}`
+  const kelas = firstItem(kelasAktif?.kelas)
+
+  const kelasText = kelas
+    ? `${kelas.tingkat ?? "-"} ${kelas.nama_kelas ?? "-"}`
     : "-"
 
   return (
@@ -348,7 +424,11 @@ export default function SiswaDashboardPage() {
             <Info label="Agama" value={siswa?.agama} />
             <Info
               label="Tahun Masuk"
-              value={String(siswa?.tahun_masuk)}
+              value={
+                siswa?.tahun_masuk
+                  ? String(siswa.tahun_masuk)
+                  : "-"
+              }
             />
           </div>
         </div>
@@ -366,7 +446,7 @@ export default function SiswaDashboardPage() {
             ) : (
               aktivitas.map((item, index) => (
                 <div
-                  key={index}
+                  key={`${item.tipe}-${item.judul}-${index}`}
                   className="rounded-xl border p-4 text-sm dark:border-slate-800"
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -385,11 +465,14 @@ export default function SiswaDashboardPage() {
 
                   <p className="mt-2 text-xs text-slate-400">
                     {item.tanggal
-                      ? new Date(item.tanggal).toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "long",
-                          year: "numeric",
-                        })
+                      ? new Date(item.tanggal).toLocaleDateString(
+                          "id-ID",
+                          {
+                            day: "numeric",
+                            month: "long",
+                            year: "numeric",
+                          }
+                        )
                       : "-"}
                   </p>
                 </div>
@@ -434,7 +517,7 @@ function Info({
   value,
 }: {
   label: string
-  value?: string
+  value?: string | null
 }) {
   return (
     <div className="flex justify-between gap-4 border-b py-2 dark:border-slate-800">

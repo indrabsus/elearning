@@ -7,19 +7,28 @@ import { supabase } from "@/lib/supabase"
 
 type Guru = {
   uid: string
-  nama_lengkap: string
-  no_hp: string
+  nama_lengkap: string | null
+  no_hp: string | null
+}
+
+type Kelas = {
+  tingkat: number | null
+  nama_kelas: string | null
+}
+
+type Mapel = {
+  nama_mapel: string | null
 }
 
 type Mengajar = {
   id_mapel_kelas_guru: string
-  kelas: {
-    tingkat: number | null
-    nama_kelas: string | null
-  } | null
-  mapel: {
-    nama_mapel: string | null
-  } | null
+  kelas: Kelas | Kelas[] | null
+  mapel: Mapel | Mapel[] | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 export default function GuruDashboardPage() {
@@ -61,12 +70,7 @@ export default function GuruDashboardPage() {
         .eq("id", userData.user.id)
         .single()
 
-      if (!profile) {
-        router.push("/")
-        return
-      }
-
-      if (profile.role !== "guru") {
+      if (!profile || profile.role !== "guru") {
         router.push("/")
         return
       }
@@ -89,9 +93,9 @@ export default function GuruDashboardPage() {
         return
       }
 
-      setGuru(guruData)
+      setGuru(guruData as Guru)
 
-      const { data: mengajarData } = await supabase
+      const { data: mengajarData, error: mengajarError } = await supabase
         .from("mapel_kelas_guru")
         .select(`
           id_mapel_kelas_guru,
@@ -106,14 +110,23 @@ export default function GuruDashboardPage() {
         .eq("uid_guru", uidGuru)
         .eq("id_tahun_ajaran", idTahunAjaran)
 
-      const dataMengajar = (mengajarData ?? []) as Mengajar[]
+      if (mengajarError) {
+        alert(mengajarError.message)
+        setLoading(false)
+        return
+      }
+
+      const dataMengajar =
+        (mengajarData ?? []) as unknown as Mengajar[]
+
       setAktivitas(dataMengajar)
 
       const kelasUnik = new Set(
-        dataMengajar.map(
-          (item) =>
-            `${item.kelas?.tingkat}-${item.kelas?.nama_kelas}`
-        )
+        dataMengajar.map((item) => {
+          const kelas = firstItem(item.kelas)
+
+          return `${kelas?.tingkat ?? "-"}-${kelas?.nama_kelas ?? "-"}`
+        })
       )
 
       setTotalKelas(kelasUnik.size)
@@ -210,20 +223,25 @@ export default function GuruDashboardPage() {
                 Belum ada pembagian mengajar untuk tahun ajaran ini.
               </p>
             ) : (
-              aktivitas.map((item) => (
-                <div
-                  key={item.id_mapel_kelas_guru}
-                  className="rounded-xl border p-4 text-sm dark:border-slate-800"
-                >
-                  <p className="font-semibold">
-                    {item.mapel?.nama_mapel ?? "-"}
-                  </p>
-                  <p className="text-slate-500 dark:text-slate-400">
-                    Kelas {item.kelas?.tingkat} -{" "}
-                    {item.kelas?.nama_kelas}
-                  </p>
-                </div>
-              ))
+              aktivitas.map((item) => {
+                const mapel = firstItem(item.mapel)
+                const kelas = firstItem(item.kelas)
+
+                return (
+                  <div
+                    key={item.id_mapel_kelas_guru}
+                    className="rounded-xl border p-4 text-sm dark:border-slate-800"
+                  >
+                    <p className="font-semibold">
+                      {mapel?.nama_mapel ?? "-"}
+                    </p>
+                    <p className="text-slate-500 dark:text-slate-400">
+                      Kelas {kelas?.tingkat ?? "-"} -{" "}
+                      {kelas?.nama_kelas ?? "-"}
+                    </p>
+                  </div>
+                )
+              })
             )}
           </div>
         </div>
@@ -264,7 +282,7 @@ function Info({
   value,
 }: {
   label: string
-  value?: string
+  value?: string | null
 }) {
   return (
     <div className="flex justify-between gap-4 border-b py-2 dark:border-slate-800">

@@ -13,6 +13,25 @@ import {
 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
+type Kelas = {
+  tingkat: number | null
+  nama_kelas: string | null
+}
+
+type Mapel = {
+  nama_mapel: string | null
+}
+
+type SiswaKelas = {
+  id_kelas: string | null
+  kelas: Kelas | Kelas[] | null
+}
+
+type MapelKelasGuru = {
+  mapel: Mapel | Mapel[] | null
+  kelas: Kelas | Kelas[] | null
+}
+
 type Tugas = {
   id_tugas: string
   id_mapel_kelas_guru: string
@@ -22,15 +41,7 @@ type Tugas = {
   status: string | null
   created_at: string | null
   tipe_tugas: string | null
-  mapel_kelas_guru: {
-    mapel: {
-      nama_mapel: string | null
-    } | null
-    kelas: {
-      tingkat: number | null
-      nama_kelas: string | null
-    } | null
-  } | null
+  mapel_kelas_guru: MapelKelasGuru | MapelKelasGuru[] | null
 }
 
 type TugasSiswa = {
@@ -47,6 +58,11 @@ type TugasSiswa = {
 
 type TugasView = Tugas & {
   pengerjaan: TugasSiswa | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 const ITEMS_PER_PAGE = 9
@@ -95,19 +111,29 @@ export default function SiswaTugasPage() {
         return
       }
 
-      const { data: siswaKelas } = await supabase
-        .from("siswa_kelas")
-        .select(`
-          id_kelas,
-          kelas:id_kelas (
-            tingkat,
-            nama_kelas
-          )
-        `)
-        .eq("nisn", profile.nisn)
-        .eq("id_tahun_ajaran", idTahunAjaran)
-        .eq("status", "aktif")
-        .maybeSingle()
+      const { data: siswaKelasData, error: siswaKelasError } =
+        await supabase
+          .from("siswa_kelas")
+          .select(`
+            id_kelas,
+            kelas:id_kelas (
+              tingkat,
+              nama_kelas
+            )
+          `)
+          .eq("nisn", profile.nisn)
+          .eq("id_tahun_ajaran", idTahunAjaran)
+          .eq("status", "aktif")
+          .maybeSingle()
+
+      if (siswaKelasError) {
+        alert(siswaKelasError.message)
+        setLoading(false)
+        return
+      }
+
+      const siswaKelas =
+        siswaKelasData as unknown as SiswaKelas | null
 
       if (!siswaKelas?.id_kelas) {
         setTugasList([])
@@ -115,17 +141,26 @@ export default function SiswaTugasPage() {
         return
       }
 
+      const kelas = firstItem(siswaKelas.kelas)
+
       setKelasText(
-        `${siswaKelas.kelas?.tingkat ?? ""} ${
-          siswaKelas.kelas?.nama_kelas ?? ""
-        }`
+        kelas
+          ? `${kelas.tingkat ?? "-"} ${kelas.nama_kelas ?? "-"}`
+          : "-"
       )
 
-      const { data: mengajarData } = await supabase
-        .from("mapel_kelas_guru")
-        .select("id_mapel_kelas_guru")
-        .eq("id_kelas", siswaKelas.id_kelas)
-        .eq("id_tahun_ajaran", idTahunAjaran)
+      const { data: mengajarData, error: mengajarError } =
+        await supabase
+          .from("mapel_kelas_guru")
+          .select("id_mapel_kelas_guru")
+          .eq("id_kelas", siswaKelas.id_kelas)
+          .eq("id_tahun_ajaran", idTahunAjaran)
+
+      if (mengajarError) {
+        alert(mengajarError.message)
+        setLoading(false)
+        return
+      }
 
       const idsMengajar =
         mengajarData?.map((item) => item.id_mapel_kelas_guru) ?? []
@@ -167,30 +202,37 @@ export default function SiswaTugasPage() {
         return
       }
 
-      const tugas = (tugasData ?? []) as Tugas[]
-
+      const tugas = (tugasData ?? []) as unknown as Tugas[]
       const idsTugas = tugas.map((item) => item.id_tugas)
 
       let pengerjaanData: TugasSiswa[] = []
 
       if (idsTugas.length > 0) {
-        const { data: tugasSiswaData } = await supabase
-          .from("tugas_siswa")
-          .select(`
-            id_tugas_siswa,
-            id_tugas,
-            nisn,
-            status,
-            mulai_at,
-            selesai_at,
-            nilai,
-            jawaban,
-            file_url
-          `)
-          .eq("nisn", profile.nisn)
-          .in("id_tugas", idsTugas)
+        const { data: tugasSiswaData, error: tugasSiswaError } =
+          await supabase
+            .from("tugas_siswa")
+            .select(`
+              id_tugas_siswa,
+              id_tugas,
+              nisn,
+              status,
+              mulai_at,
+              selesai_at,
+              nilai,
+              jawaban,
+              file_url
+            `)
+            .eq("nisn", profile.nisn)
+            .in("id_tugas", idsTugas)
 
-        pengerjaanData = (tugasSiswaData ?? []) as TugasSiswa[]
+        if (tugasSiswaError) {
+          alert(tugasSiswaError.message)
+          setLoading(false)
+          return
+        }
+
+        pengerjaanData =
+          (tugasSiswaData ?? []) as unknown as TugasSiswa[]
       }
 
       const tugasView: TugasView[] = tugas.map((item) => ({
@@ -212,16 +254,23 @@ export default function SiswaTugasPage() {
     setPage(1)
   }, [search])
 
+  const getTugasRelasi = (item: Tugas) => {
+    const mengajar = firstItem(item.mapel_kelas_guru)
+    const mapel = firstItem(mengajar?.mapel)
+    const kelas = firstItem(mengajar?.kelas)
+
+    return { mengajar, mapel, kelas }
+  }
+
   const filteredTugas = tugasList.filter((item) => {
     const keyword = search.toLowerCase()
+    const { mapel } = getTugasRelasi(item)
 
     return (
       item.judul.toLowerCase().includes(keyword) ||
       String(item.deskripsi ?? "").toLowerCase().includes(keyword) ||
       String(item.tipe_tugas ?? "").toLowerCase().includes(keyword) ||
-      String(item.mapel_kelas_guru?.mapel?.nama_mapel ?? "")
-        .toLowerCase()
-        .includes(keyword)
+      String(mapel?.nama_mapel ?? "").toLowerCase().includes(keyword)
     )
   })
 
@@ -249,15 +298,22 @@ export default function SiswaTugasPage() {
     return new Date(deadline).getTime() < Date.now()
   }
 
+  const sudahSelesai = (item: TugasView) => {
+    return (
+      item.pengerjaan?.status === "selesai" ||
+      item.pengerjaan?.status === "dinilai"
+    )
+  }
+
   const getStatusLabel = (item: TugasView) => {
-    if (item.pengerjaan?.status === "selesai") return "Sudah Dikerjakan"
+    if (sudahSelesai(item)) return "Sudah Dikerjakan"
     if (item.pengerjaan?.status === "dikerjakan") return "Sedang Dikerjakan"
     if (isLewatDeadline(item.deadline)) return "Terlambat"
     return "Belum Dikerjakan"
   }
 
   const getStatusClass = (item: TugasView) => {
-    if (item.pengerjaan?.status === "selesai") {
+    if (sudahSelesai(item)) {
       return "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
     }
 
@@ -321,8 +377,9 @@ export default function SiswaTugasPage() {
       ) : (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {paginatedTugas.map((item) => {
+            const { mapel } = getTugasRelasi(item)
             const lewatDeadline = isLewatDeadline(item.deadline)
-            const sudahSelesai = item.pengerjaan?.status === "selesai"
+            const selesai = sudahSelesai(item)
 
             return (
               <div
@@ -332,7 +389,7 @@ export default function SiswaTugasPage() {
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
                     <FileText size={16} />
-                    {item.mapel_kelas_guru?.mapel?.nama_mapel ?? "-"}
+                    {mapel?.nama_mapel ?? "-"}
                   </div>
 
                   <span
@@ -371,7 +428,7 @@ export default function SiswaTugasPage() {
                       </div>
                     )}
 
-                  {lewatDeadline && !sudahSelesai && (
+                  {lewatDeadline && !selesai && (
                     <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
                       <AlertCircle size={16} />
                       Deadline sudah lewat
@@ -382,14 +439,14 @@ export default function SiswaTugasPage() {
                 <Link
                   href={`/siswa/tugas/${item.id_tugas}`}
                   className={`mt-5 inline-flex w-full items-center justify-center rounded-xl px-4 py-2 text-sm font-medium ${
-                    lewatDeadline && !sudahSelesai
-                      ? "bg-slate-200 text-slate-500 pointer-events-none dark:bg-slate-800"
-                      : sudahSelesai
+                    lewatDeadline && !selesai
+                      ? "pointer-events-none bg-slate-200 text-slate-500 dark:bg-slate-800"
+                      : selesai
                       ? "bg-green-600 text-white hover:bg-green-700"
                       : "bg-blue-600 text-white hover:bg-blue-700"
                   }`}
                 >
-                  {sudahSelesai ? "Lihat Jawaban" : "Kerjakan"}
+                  {selesai ? "Lihat Jawaban" : "Kerjakan"}
                 </Link>
               </div>
             )

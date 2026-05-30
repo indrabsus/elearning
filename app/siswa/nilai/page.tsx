@@ -5,27 +5,38 @@ import { useRouter } from "next/navigation"
 import { BarChart3, FileText } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
+type Mapel = {
+  nama_mapel: string | null
+}
+
+type MapelKelasGuru = {
+  mapel: Mapel | Mapel[] | null
+}
+
+type TugasRelasi = {
+  id_tugas: string
+  judul: string
+  tipe_tugas: string | null
+  mapel_kelas_guru: MapelKelasGuru | MapelKelasGuru[] | null
+}
+
 type NilaiItem = {
   id_tugas_siswa: string
   nilai: number | null
   status: string | null
   selesai_at: string | null
-  tugas: {
-    id_tugas: string
-    judul: string
-    tipe_tugas: string | null
-    mapel_kelas_guru: {
-      mapel: {
-        nama_mapel: string | null
-      } | null
-    } | null
-  } | null
+  tugas: TugasRelasi | TugasRelasi[] | null
 }
 
 type GroupedNilai = {
   mapel: string
   items: NilaiItem[]
   rataRata: number
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 export default function SiswaNilaiPage() {
@@ -87,13 +98,16 @@ export default function SiswaNilaiPage() {
         return
       }
 
-      const nilaiList = (data ?? []) as NilaiItem[]
+      const nilaiList =
+        (data ?? []) as unknown as NilaiItem[]
 
       const grouped = nilaiList.reduce<Record<string, NilaiItem[]>>(
         (acc, item) => {
-          const namaMapel =
-            item.tugas?.mapel_kelas_guru?.mapel?.nama_mapel ??
-            "Tanpa Mapel"
+          const tugas = firstItem(item.tugas)
+          const mengajar = firstItem(tugas?.mapel_kelas_guru)
+          const mapel = firstItem(mengajar?.mapel)
+
+          const namaMapel = mapel?.nama_mapel ?? "Tanpa Mapel"
 
           if (!acc[namaMapel]) acc[namaMapel] = []
           acc[namaMapel].push(item)
@@ -213,41 +227,45 @@ export default function SiswaNilaiPage() {
                   </thead>
 
                   <tbody>
-                    {group.items.map((item, index) => (
-                      <tr
-                        key={item.id_tugas_siswa}
-                        className="border-b dark:border-slate-800"
-                      >
-                        <td className="py-3 pr-4">{index + 1}</td>
+                    {group.items.map((item, index) => {
+                      const tugas = firstItem(item.tugas)
 
-                        <td className="min-w-56 py-3 pr-4">
-                          <div className="flex items-center gap-2">
-                            <FileText size={16} />
-                            <span className="font-medium">
-                              {item.tugas?.judul ?? "-"}
+                      return (
+                        <tr
+                          key={item.id_tugas_siswa}
+                          className="border-b dark:border-slate-800"
+                        >
+                          <td className="py-3 pr-4">{index + 1}</td>
+
+                          <td className="min-w-56 py-3 pr-4">
+                            <div className="flex items-center gap-2">
+                              <FileText size={16} />
+                              <span className="font-medium">
+                                {tugas?.judul ?? "-"}
+                              </span>
+                            </div>
+                          </td>
+
+                          <td className="py-3 pr-4">
+                            {getTipeLabel(tugas?.tipe_tugas ?? null)}
+                          </td>
+
+                          <td className="py-3 pr-4">
+                            {formatTanggal(item.selesai_at)}
+                          </td>
+
+                          <td className="py-3 pr-4 capitalize">
+                            {item.status ?? "-"}
+                          </td>
+
+                          <td className="py-3 pr-4">
+                            <span className="rounded-full bg-green-100 px-3 py-1 font-semibold text-green-700 dark:bg-green-950 dark:text-green-300">
+                              {item.nilai}
                             </span>
-                          </div>
-                        </td>
-
-                        <td className="py-3 pr-4">
-                          {getTipeLabel(item.tugas?.tipe_tugas ?? null)}
-                        </td>
-
-                        <td className="py-3 pr-4">
-                          {formatTanggal(item.selesai_at)}
-                        </td>
-
-                        <td className="py-3 pr-4 capitalize">
-                          {item.status ?? "-"}
-                        </td>
-
-                        <td className="py-3 pr-4">
-                          <span className="rounded-full bg-green-100 px-3 py-1 font-semibold text-green-700 dark:bg-green-950 dark:text-green-300">
-                            {item.nilai}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

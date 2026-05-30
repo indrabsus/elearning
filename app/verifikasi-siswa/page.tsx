@@ -34,7 +34,12 @@ type SiswaKelas = {
   id_siswa_kelas: string
   id_kelas: string
   status: string | null
-  kelas: Kelas | null
+  kelas: Kelas | Kelas[] | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 export default function VerifikasiSiswaPage() {
@@ -64,7 +69,7 @@ export default function VerifikasiSiswaPage() {
         return
       }
 
-      setKelasList(data ?? [])
+      setKelasList((data ?? []) as Kelas[])
     }
 
     getKelas()
@@ -114,7 +119,8 @@ export default function VerifikasiSiswaPage() {
       return
     }
 
-    setSiswa(data as Siswa)
+    const siswaFinal = data as Siswa
+    setSiswa(siswaFinal)
 
     const idTahunAjaran =
       localStorage.getItem("id_tahun_ajaran") || ""
@@ -125,21 +131,22 @@ export default function VerifikasiSiswaPage() {
       return
     }
 
-    const { data: siswaKelasData, error: siswaKelasError } = await supabase
-      .from("siswa_kelas")
-      .select(`
-        id_siswa_kelas,
-        id_kelas,
-        status,
-        kelas:id_kelas (
+    const { data: siswaKelasData, error: siswaKelasError } =
+      await supabase
+        .from("siswa_kelas")
+        .select(`
+          id_siswa_kelas,
           id_kelas,
-          tingkat,
-          nama_kelas
-        )
-      `)
-      .eq("nisn", data.nisn)
-      .eq("id_tahun_ajaran", idTahunAjaran)
-      .maybeSingle()
+          status,
+          kelas:id_kelas (
+            id_kelas,
+            tingkat,
+            nama_kelas
+          )
+        `)
+        .eq("nisn", siswaFinal.nisn)
+        .eq("id_tahun_ajaran", idTahunAjaran)
+        .maybeSingle()
 
     if (siswaKelasError) {
       setError(siswaKelasError.message)
@@ -148,8 +155,11 @@ export default function VerifikasiSiswaPage() {
     }
 
     if (siswaKelasData) {
-      setSiswaKelas(siswaKelasData as SiswaKelas)
-      setSelectedKelas(siswaKelasData.id_kelas)
+      const siswaKelasFinal =
+        siswaKelasData as unknown as SiswaKelas
+
+      setSiswaKelas(siswaKelasFinal)
+      setSelectedKelas(siswaKelasFinal.id_kelas)
     }
 
     setLoading(false)
@@ -189,12 +199,19 @@ export default function VerifikasiSiswaPage() {
       return
     }
 
-    const { data: existingProfile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("nisn", siswa.nisn)
-      .neq("id", userData.user.id)
-      .maybeSingle()
+    const { data: existingProfile, error: existingProfileError } =
+      await supabase
+        .from("profiles")
+        .select("id")
+        .eq("nisn", siswa.nisn)
+        .neq("id", userData.user.id)
+        .maybeSingle()
+
+    if (existingProfileError) {
+      setError(existingProfileError.message)
+      setLoading(false)
+      return
+    }
 
     if (existingProfile) {
       setError("NISN sudah digunakan akun lain")
@@ -202,12 +219,19 @@ export default function VerifikasiSiswaPage() {
       return
     }
 
-    const { data: existingSiswaKelas } = await supabase
-      .from("siswa_kelas")
-      .select("id_siswa_kelas")
-      .eq("nisn", siswa.nisn)
-      .eq("id_tahun_ajaran", idTahunAjaran)
-      .maybeSingle()
+    const { data: existingSiswaKelas, error: existingSiswaKelasError } =
+      await supabase
+        .from("siswa_kelas")
+        .select("id_siswa_kelas")
+        .eq("nisn", siswa.nisn)
+        .eq("id_tahun_ajaran", idTahunAjaran)
+        .maybeSingle()
+
+    if (existingSiswaKelasError) {
+      setError(existingSiswaKelasError.message)
+      setLoading(false)
+      return
+    }
 
     if (existingSiswaKelas) {
       const { error: updateError } = await supabase
@@ -256,6 +280,8 @@ export default function VerifikasiSiswaPage() {
     router.push("/siswa/dashboard")
   }
 
+  const kelasSiswa = firstItem(siswaKelas?.kelas)
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4 dark:bg-slate-950">
       <Card className="w-full max-w-lg shadow-xl">
@@ -303,17 +329,25 @@ export default function VerifikasiSiswaPage() {
               </h3>
 
               <div className="space-y-2">
-                <p><b>NISN:</b> {siswa.nisn}</p>
-                <p><b>Nama:</b> {siswa.nama_lengkap}</p>
+                <p>
+                  <b>NISN:</b> {siswa.nisn}
+                </p>
+
+                <p>
+                  <b>Nama:</b> {siswa.nama_lengkap}
+                </p>
 
                 <p>
                   <b>Tempat Tanggal Lahir:</b>{" "}
                   {siswa.tempat_lahir},{" "}
-                  {new Date(siswa.tanggal_lahir).toLocaleDateString("id-ID", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
+                  {new Date(siswa.tanggal_lahir).toLocaleDateString(
+                    "id-ID",
+                    {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    }
+                  )}
                 </p>
 
                 <p>
@@ -321,13 +355,22 @@ export default function VerifikasiSiswaPage() {
                   {siswa.jenkel === "P" ? "Perempuan" : "Laki-laki"}
                 </p>
 
-                <p><b>Agama:</b> {siswa.agama}</p>
-                <p><b>Tahun Masuk:</b> {siswa.tahun_masuk}</p>
+                <p>
+                  <b>Agama:</b> {siswa.agama}
+                </p>
+
+                <p>
+                  <b>Tahun Masuk:</b> {siswa.tahun_masuk}
+                </p>
 
                 {siswaKelas ? (
                   <p>
                     <b>Kelas Tahun Ajaran Ini:</b>{" "}
-                    {siswaKelas.kelas?.tingkat} {siswaKelas.kelas?.nama_kelas}
+                    {kelasSiswa
+                      ? `${kelasSiswa.tingkat ?? "-"} ${
+                          kelasSiswa.nama_kelas ?? "-"
+                        }`
+                      : "-"}
                   </p>
                 ) : (
                   <div className="space-y-2 pt-2">

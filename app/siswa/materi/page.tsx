@@ -5,6 +5,27 @@ import { useRouter } from "next/navigation"
 import { BookOpen, ExternalLink, Search } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
+type Kelas = {
+  tingkat: number | null
+  nama_kelas: string | null
+}
+
+type SiswaKelas = {
+  id_kelas: string | null
+  kelas: Kelas | Kelas[] | null
+}
+
+type Mapel = {
+  nama_mapel: string | null
+}
+
+type MapelKelasGuru = {
+  id_kelas: string | null
+  id_mapel: string | null
+  mapel: Mapel | Mapel[] | null
+  kelas: Kelas | Kelas[] | null
+}
+
 type Materi = {
   id_materi: string
   nama_materi: string | null
@@ -12,17 +33,12 @@ type Materi = {
   url: string | null
   created_at: string
   id_mapel_kelas_guru: string | null
-  mapel_kelas_guru: {
-    id_kelas: string | null
-    id_mapel: string | null
-    mapel: {
-      nama_mapel: string | null
-    } | null
-    kelas: {
-      tingkat: number | null
-      nama_kelas: string | null
-    } | null
-  } | null
+  mapel_kelas_guru: MapelKelasGuru | MapelKelasGuru[] | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 const ITEMS_PER_PAGE = 9
@@ -71,19 +87,29 @@ export default function SiswaMateriPage() {
         return
       }
 
-      const { data: siswaKelas } = await supabase
-        .from("siswa_kelas")
-        .select(`
-          id_kelas,
-          kelas:id_kelas (
-            tingkat,
-            nama_kelas
-          )
-        `)
-        .eq("nisn", profile.nisn)
-        .eq("id_tahun_ajaran", idTahunAjaran)
-        .eq("status", "aktif")
-        .maybeSingle()
+      const { data: siswaKelasData, error: siswaKelasError } =
+        await supabase
+          .from("siswa_kelas")
+          .select(`
+            id_kelas,
+            kelas:id_kelas (
+              tingkat,
+              nama_kelas
+            )
+          `)
+          .eq("nisn", profile.nisn)
+          .eq("id_tahun_ajaran", idTahunAjaran)
+          .eq("status", "aktif")
+          .maybeSingle()
+
+      if (siswaKelasError) {
+        alert(siswaKelasError.message)
+        setLoading(false)
+        return
+      }
+
+      const siswaKelas =
+        siswaKelasData as unknown as SiswaKelas | null
 
       if (!siswaKelas?.id_kelas) {
         setMateriList([])
@@ -91,17 +117,26 @@ export default function SiswaMateriPage() {
         return
       }
 
+      const kelas = firstItem(siswaKelas.kelas)
+
       setKelasText(
-        `${siswaKelas.kelas?.tingkat ?? ""} ${
-          siswaKelas.kelas?.nama_kelas ?? ""
-        }`
+        kelas
+          ? `${kelas.tingkat ?? "-"} ${kelas.nama_kelas ?? "-"}`
+          : "-"
       )
 
-      const { data: mengajarData } = await supabase
-        .from("mapel_kelas_guru")
-        .select("id_mapel_kelas_guru")
-        .eq("id_kelas", siswaKelas.id_kelas)
-        .eq("id_tahun_ajaran", idTahunAjaran)
+      const { data: mengajarData, error: mengajarError } =
+        await supabase
+          .from("mapel_kelas_guru")
+          .select("id_mapel_kelas_guru")
+          .eq("id_kelas", siswaKelas.id_kelas)
+          .eq("id_tahun_ajaran", idTahunAjaran)
+
+      if (mengajarError) {
+        alert(mengajarError.message)
+        setLoading(false)
+        return
+      }
 
       const idsMengajar =
         mengajarData?.map((item) => item.id_mapel_kelas_guru) ?? []
@@ -142,7 +177,7 @@ export default function SiswaMateriPage() {
         return
       }
 
-      setMateriList((materiData ?? []) as Materi[])
+      setMateriList((materiData ?? []) as unknown as Materi[])
       setLoading(false)
     }
 
@@ -153,15 +188,22 @@ export default function SiswaMateriPage() {
     setPage(1)
   }, [search])
 
+  const getMateriRelasi = (item: Materi) => {
+    const mengajar = firstItem(item.mapel_kelas_guru)
+    const mapel = firstItem(mengajar?.mapel)
+    const kelas = firstItem(mengajar?.kelas)
+
+    return { mengajar, mapel, kelas }
+  }
+
   const filteredMateri = materiList.filter((item) => {
     const keyword = search.toLowerCase()
+    const { mapel } = getMateriRelasi(item)
 
     return (
       String(item.nama_materi ?? "").toLowerCase().includes(keyword) ||
       String(item.deskripsi ?? "").toLowerCase().includes(keyword) ||
-      String(item.mapel_kelas_guru?.mapel?.nama_mapel ?? "")
-        .toLowerCase()
-        .includes(keyword)
+      String(mapel?.nama_mapel ?? "").toLowerCase().includes(keyword)
     )
   })
 
@@ -174,7 +216,11 @@ export default function SiswaMateriPage() {
 
   const isYoutube = (url?: string | null) => {
     if (!url) return false
-    return url.includes("youtube.com") || url.includes("youtu.be")
+
+    return (
+      url.includes("youtube.com") ||
+      url.includes("youtu.be")
+    )
   }
 
   const getYoutubeEmbed = (url: string) => {
@@ -240,51 +286,55 @@ export default function SiswaMateriPage() {
         </div>
       ) : (
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {paginatedMateri.map((item) => (
-            <div
-              key={item.id_materi}
-              className="overflow-hidden rounded-2xl border bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
-            >
-              {item.url && isYoutube(item.url) && (
-                <iframe
-                  src={getYoutubeEmbed(item.url)}
-                  className="aspect-video w-full"
-                  allowFullScreen
-                />
-              )}
+          {paginatedMateri.map((item) => {
+            const { mapel } = getMateriRelasi(item)
 
-              <div className="p-5">
-                <div className="mb-3 flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
-                  <BookOpen size={16} />
-                  {item.mapel_kelas_guru?.mapel?.nama_mapel ?? "-"}
-                </div>
-
-                <h2 className="text-lg font-semibold">
-                  {item.nama_materi}
-                </h2>
-
-                <p className="mt-2 line-clamp-3 text-sm text-slate-500 dark:text-slate-400">
-                  {item.deskripsi || "Tidak ada deskripsi."}
-                </p>
-
-                <p className="mt-3 text-xs text-slate-400">
-                  Dibuat: {formatTanggal(item.created_at)}
-                </p>
-
-                {item.url && (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                  >
-                    <ExternalLink size={16} />
-                    Buka Materi
-                  </a>
+            return (
+              <div
+                key={item.id_materi}
+                className="overflow-hidden rounded-2xl border bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              >
+                {item.url && isYoutube(item.url) && (
+                  <iframe
+                    src={getYoutubeEmbed(item.url)}
+                    className="aspect-video w-full"
+                    allowFullScreen
+                  />
                 )}
+
+                <div className="p-5">
+                  <div className="mb-3 flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                    <BookOpen size={16} />
+                    {mapel?.nama_mapel ?? "-"}
+                  </div>
+
+                  <h2 className="text-lg font-semibold">
+                    {item.nama_materi}
+                  </h2>
+
+                  <p className="mt-2 line-clamp-3 text-sm text-slate-500 dark:text-slate-400">
+                    {item.deskripsi || "Tidak ada deskripsi."}
+                  </p>
+
+                  <p className="mt-3 text-xs text-slate-400">
+                    Dibuat: {formatTanggal(item.created_at)}
+                  </p>
+
+                  {item.url && (
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    >
+                      <ExternalLink size={16} />
+                      Buka Materi
+                    </a>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

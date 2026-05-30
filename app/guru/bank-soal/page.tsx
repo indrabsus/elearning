@@ -21,31 +21,28 @@ export type OpsiForm = {
 }
 
 export type BankSoal = {
-  id_soal: string;
-  id_mapel: string;
-  uid_guru: string;
-  pertanyaan: string;
-  tipe_soal: string;
-  tingkat_kesulitan: string | null;
-  pembahasan: string | null;
-  gambar_url: string | null;
-  audio_url: string | null;
-  created_at: string;
-  mapel: Mapel[] | null;
-  opsi_jawaban: OpsiJawaban[];
-};
-
-type OpsiJawaban = {
-  id_opsi: string;
-  label: string;
-  isi_opsi: string;
-  is_benar: boolean | null;
-  gambar_url: string | null;
-};
+  id_soal: string
+  id_mapel: string | null
+  uid_guru: number | null
+  pertanyaan: string
+  tipe_soal: string | null
+  tingkat_kesulitan: string | null
+  pembahasan: string | null
+  gambar_url: string | null
+  audio_url: string | null
+  created_at: string | null
+  mapel: Mapel | Mapel[] | null
+  opsi_jawaban: OpsiForm[]
+}
 
 type MengajarMapel = {
   id_mapel: string | null
-  mapel: Mapel[] | null
+  mapel: Mapel | Mapel[] | null
+}
+
+function firstItem<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null
+  return Array.isArray(value) ? value[0] ?? null : value
 }
 
 const ITEMS_PER_PAGE = 10
@@ -165,12 +162,10 @@ export default function BankSoalPage() {
 
     const mapelUnik = Array.from(
       new Map(
-        ((mengajarData ?? []) as MengajarMapel[])
-          .filter((item) => item.mapel)
-          .map((item) => [
-            item.mapel!.id_mapel,
-            item.mapel!,
-          ])
+        ((mengajarData ?? []) as unknown as MengajarMapel[])
+          .map((item) => firstItem(item.mapel))
+          .filter((mapel): mapel is Mapel => Boolean(mapel))
+          .map((mapel) => [mapel.id_mapel, mapel])
       ).values()
     )
 
@@ -205,10 +200,15 @@ export default function BankSoalPage() {
     const yakin = confirm("Yakin ingin menghapus soal ini?")
     if (!yakin) return
 
-    await supabase
+    const { error: opsiError } = await supabase
       .from("opsi_jawaban")
       .delete()
       .eq("id_soal", id)
+
+    if (opsiError) {
+      alert(opsiError.message)
+      return
+    }
 
     const { error } = await supabase
       .from("bank_soal")
@@ -227,10 +227,11 @@ export default function BankSoalPage() {
 
   const filteredSoal = soalList.filter((item) => {
     const keyword = search.toLowerCase()
+    const mapel = firstItem(item.mapel)
 
     return (
       item.pertanyaan.toLowerCase().includes(keyword) ||
-      String(item.mapel?.[0]?.nama_mapel ?? "")
+      String(mapel?.nama_mapel ?? "")
         .toLowerCase()
         .includes(keyword) ||
       String(item.tipe_soal ?? "")
