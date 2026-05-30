@@ -35,6 +35,11 @@ export type BankSoal = {
   opsi_jawaban: OpsiForm[]
 }
 
+type MengajarMapel = {
+  id_mapel: string | null
+  mapel: Mapel | null
+}
+
 const ITEMS_PER_PAGE = 10
 
 export default function BankSoalPage() {
@@ -42,6 +47,7 @@ export default function BankSoalPage() {
 
   const [uidGuru, setUidGuru] = useState<number | null>(null)
   const [mapelList, setMapelList] = useState<Mapel[]>([])
+  const [selectedMapel, setSelectedMapel] = useState("")
   const [soalList, setSoalList] = useState<BankSoal[]>([])
   const [editSoal, setEditSoal] = useState<BankSoal | null>(null)
 
@@ -49,8 +55,8 @@ export default function BankSoalPage() {
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
 
-  const loadSoal = async (guruUid: number) => {
-    const { data, error } = await supabase
+  const loadSoal = async (guruUid: number, idMapel?: string) => {
+    let query = supabase
       .from("bank_soal")
       .select(`
         id_soal,
@@ -78,6 +84,12 @@ export default function BankSoalPage() {
       .eq("uid_guru", guruUid)
       .order("created_at", { ascending: false })
 
+    if (idMapel) {
+      query = query.eq("id_mapel", idMapel)
+    }
+
+    const { data, error } = await query
+
     if (error) {
       alert(error.message)
       return
@@ -88,6 +100,15 @@ export default function BankSoalPage() {
 
   const initPage = async () => {
     setLoading(true)
+
+    const idTahunAjaran =
+      localStorage.getItem("id_tahun_ajaran") || ""
+
+    if (!idTahunAjaran) {
+      alert("Tahun ajaran belum dipilih. Silakan login ulang.")
+      router.push("/")
+      return
+    }
 
     const { data: userData } = await supabase.auth.getUser()
 
@@ -115,14 +136,42 @@ export default function BankSoalPage() {
     const guruUid = Number(profile.uid_guru)
     setUidGuru(guruUid)
 
-    const { data: mapelData } = await supabase
-      .from("mapel")
-      .select("id_mapel, nama_mapel")
-      .order("nama_mapel", { ascending: true })
+    const { data: mengajarData, error: mengajarError } =
+      await supabase
+        .from("mapel_kelas_guru")
+        .select(`
+          id_mapel,
+          mapel:id_mapel (
+            id_mapel,
+            nama_mapel
+          )
+        `)
+        .eq("uid_guru", guruUid)
+        .eq("id_tahun_ajaran", idTahunAjaran)
 
-    setMapelList(mapelData ?? [])
+    if (mengajarError) {
+      alert(mengajarError.message)
+      setLoading(false)
+      return
+    }
 
-    await loadSoal(guruUid)
+    const mapelUnik = Array.from(
+      new Map(
+        ((mengajarData ?? []) as MengajarMapel[])
+          .filter((item) => item.mapel)
+          .map((item) => [
+            item.mapel!.id_mapel,
+            item.mapel!,
+          ])
+      ).values()
+    )
+
+    setMapelList(mapelUnik)
+
+    const defaultMapel = mapelUnik[0]?.id_mapel ?? ""
+    setSelectedMapel(defaultMapel)
+
+    await loadSoal(guruUid, defaultMapel)
 
     setLoading(false)
   }
@@ -133,13 +182,25 @@ export default function BankSoalPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [search])
+  }, [search, selectedMapel])
+
+  const handleChangeMapel = async (idMapel: string) => {
+    setSelectedMapel(idMapel)
+    setEditSoal(null)
+
+    if (uidGuru) {
+      await loadSoal(uidGuru, idMapel)
+    }
+  }
 
   const handleDelete = async (id: string) => {
     const yakin = confirm("Yakin ingin menghapus soal ini?")
     if (!yakin) return
 
-    await supabase.from("opsi_jawaban").delete().eq("id_soal", id)
+    await supabase
+      .from("opsi_jawaban")
+      .delete()
+      .eq("id_soal", id)
 
     const { error } = await supabase
       .from("bank_soal")
@@ -151,7 +212,9 @@ export default function BankSoalPage() {
       return
     }
 
-    if (uidGuru) await loadSoal(uidGuru)
+    if (uidGuru) {
+      await loadSoal(uidGuru, selectedMapel)
+    }
   }
 
   const filteredSoal = soalList.filter((item) => {
@@ -159,9 +222,15 @@ export default function BankSoalPage() {
 
     return (
       item.pertanyaan.toLowerCase().includes(keyword) ||
-      String(item.mapel?.nama_mapel ?? "").toLowerCase().includes(keyword) ||
-      String(item.tipe_soal ?? "").toLowerCase().includes(keyword) ||
-      String(item.tingkat_kesulitan ?? "").toLowerCase().includes(keyword)
+      String(item.mapel?.nama_mapel ?? "")
+        .toLowerCase()
+        .includes(keyword) ||
+      String(item.tipe_soal ?? "")
+        .toLowerCase()
+        .includes(keyword) ||
+      String(item.tingkat_kesulitan ?? "")
+        .toLowerCase()
+        .includes(keyword)
     )
   })
 
@@ -180,16 +249,48 @@ export default function BankSoalPage() {
     )
   }
 
+  const selectedMapelName =
+    mapelList.find((item) => item.id_mapel === selectedMapel)
+      ?.nama_mapel ?? ""
+
   return (
     <div className="space-y-6">
+      <div className="rounded-2xl border bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <label className="text-sm font-medium">
+          Pilih Mapel yang Diajar
+        </label>
+
+        <select
+          value={selectedMapel}
+          onChange={(e) => handleChangeMapel(e.target.value)}
+          className="mt-2 w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
+        >
+          <option value="">Pilih Mapel</option>
+          {mapelList.map((mapel) => (
+            <option key={mapel.id_mapel} value={mapel.id_mapel}>
+              {mapel.nama_mapel}
+            </option>
+          ))}
+        </select>
+
+        {mapelList.length === 0 && (
+          <p className="mt-2 text-sm text-red-500">
+            Belum ada pembagian mengajar untuk tahun ajaran ini.
+          </p>
+        )}
+      </div>
+
       <SoalForm
         uidGuru={uidGuru}
-        mapelList={mapelList}
+        selectedMapel={selectedMapel}
+        selectedMapelName={selectedMapelName}
         editSoal={editSoal}
         onCancelEdit={() => setEditSoal(null)}
         onSuccess={async () => {
           setEditSoal(null)
-          if (uidGuru) await loadSoal(uidGuru)
+          if (uidGuru) {
+            await loadSoal(uidGuru, selectedMapel)
+          }
         }}
       />
 
@@ -202,6 +303,7 @@ export default function BankSoalPage() {
               size={18}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             />
+
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -217,7 +319,15 @@ export default function BankSoalPage() {
           itemsPerPage={ITEMS_PER_PAGE}
           onEdit={(soal) => {
             setEditSoal(soal)
-            window.scrollTo({ top: 0, behavior: "smooth" })
+
+            if (soal.id_mapel) {
+              setSelectedMapel(soal.id_mapel)
+            }
+
+            window.scrollTo({
+              top: 0,
+              behavior: "smooth",
+            })
           }}
           onDelete={handleDelete}
         />

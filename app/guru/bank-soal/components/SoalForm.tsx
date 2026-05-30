@@ -4,11 +4,12 @@ import { useEffect, useState } from "react"
 import { ImagePlus, Music, Plus } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import OpsiEditor from "./OpsiEditor"
-import type { BankSoal, Mapel, OpsiForm } from "../page"
+import type { BankSoal, OpsiForm } from "../page"
 
 type Props = {
   uidGuru: number | null
-  mapelList: Mapel[]
+  selectedMapel: string
+  selectedMapelName: string
   editSoal: BankSoal | null
   onSuccess: () => void
   onCancelEdit: () => void
@@ -24,14 +25,14 @@ const defaultOpsi = (): OpsiForm[] => [
 
 export default function SoalForm({
   uidGuru,
-  mapelList,
+  selectedMapel,
+  selectedMapelName,
   editSoal,
   onSuccess,
   onCancelEdit,
 }: Props) {
   const [saving, setSaving] = useState(false)
 
-  const [idMapel, setIdMapel] = useState("")
   const [pertanyaan, setPertanyaan] = useState("")
   const [tipeSoal, setTipeSoal] = useState("pg")
   const [tingkatKesulitan, setTingkatKesulitan] = useState("mudah")
@@ -46,7 +47,6 @@ export default function SoalForm({
       return
     }
 
-    setIdMapel(editSoal.id_mapel ?? "")
     setPertanyaan(editSoal.pertanyaan)
     setTipeSoal(editSoal.tipe_soal ?? "pg")
     setTingkatKesulitan(editSoal.tingkat_kesulitan ?? "mudah")
@@ -72,7 +72,6 @@ export default function SoalForm({
   }, [editSoal])
 
   const resetForm = () => {
-    setIdMapel("")
     setPertanyaan("")
     setTipeSoal("pg")
     setTingkatKesulitan("mudah")
@@ -105,6 +104,91 @@ export default function SoalForm({
     if (folder === "audio") setAudioUrl(publicUrl.publicUrl)
   }
 
+  const simpanOpsi = async (idSoal: string) => {
+    if (tipeSoal !== "pg") return true
+
+    const opsiValid = opsi.filter(
+      (item) => item.isi_opsi.trim() || item.gambar_url
+    )
+
+    const idOpsiYangMasihDipakai = opsiValid
+      .map((item) => item.id_opsi)
+      .filter(Boolean) as string[]
+
+    if (editSoal) {
+      const opsiLama = editSoal.opsi_jawaban ?? []
+
+      const opsiDihapus = opsiLama.filter(
+        (item) =>
+          item.id_opsi && !idOpsiYangMasihDipakai.includes(item.id_opsi)
+      )
+
+      for (const item of opsiDihapus) {
+        const { count } = await supabase
+          .from("jawaban_tugas_siswa")
+          .select("*", { count: "exact", head: true })
+          .eq("id_opsi", item.id_opsi)
+
+        if ((count ?? 0) > 0) {
+          alert(
+            `Opsi ${item.label} tidak bisa dihapus karena sudah pernah dipakai siswa. Kosongkan teksnya saja atau buat soal baru.`
+          )
+          setSaving(false)
+          return false
+        }
+
+        const { error: deleteError } = await supabase
+          .from("opsi_jawaban")
+          .delete()
+          .eq("id_opsi", item.id_opsi)
+
+        if (deleteError) {
+          alert(deleteError.message)
+          setSaving(false)
+          return false
+        }
+      }
+    }
+
+    for (const item of opsiValid) {
+      if (item.id_opsi) {
+        const { error: updateOpsiError } = await supabase
+          .from("opsi_jawaban")
+          .update({
+            label: item.label,
+            isi_opsi: item.isi_opsi || "-",
+            gambar_url: item.gambar_url || null,
+            is_benar: item.is_benar,
+          })
+          .eq("id_opsi", item.id_opsi)
+
+        if (updateOpsiError) {
+          alert(updateOpsiError.message)
+          setSaving(false)
+          return false
+        }
+      } else {
+        const { error: insertOpsiError } = await supabase
+          .from("opsi_jawaban")
+          .insert({
+            id_soal: idSoal,
+            label: item.label,
+            isi_opsi: item.isi_opsi || "-",
+            gambar_url: item.gambar_url || null,
+            is_benar: item.is_benar,
+          })
+
+        if (insertOpsiError) {
+          alert(insertOpsiError.message)
+          setSaving(false)
+          return false
+        }
+      }
+    }
+
+    return true
+  }
+
   const handleSubmit = async (e: React.BaseSyntheticEvent) => {
     e.preventDefault()
 
@@ -113,8 +197,13 @@ export default function SoalForm({
       return
     }
 
-    if (!idMapel || !pertanyaan || !tipeSoal) {
-      alert("Mapel, pertanyaan, dan tipe soal wajib diisi")
+    if (!selectedMapel) {
+      alert("Pilih mapel terlebih dahulu")
+      return
+    }
+
+    if (!pertanyaan || !tipeSoal) {
+      alert("Pertanyaan dan tipe soal wajib diisi")
       return
     }
 
@@ -142,7 +231,7 @@ export default function SoalForm({
       const { error } = await supabase
         .from("bank_soal")
         .update({
-          id_mapel: idMapel,
+          id_mapel: selectedMapel,
           pertanyaan,
           tipe_soal: tipeSoal,
           tingkat_kesulitan: tingkatKesulitan,
@@ -158,15 +247,12 @@ export default function SoalForm({
         return
       }
 
-      await supabase
-        .from("opsi_jawaban")
-        .delete()
-        .eq("id_soal", editSoal.id_soal)
+      idSoal = editSoal.id_soal
     } else {
       const { data, error } = await supabase
         .from("bank_soal")
         .insert({
-          id_mapel: idMapel,
+          id_mapel: selectedMapel,
           uid_guru: uidGuru,
           pertanyaan,
           tipe_soal: tipeSoal,
@@ -187,26 +273,10 @@ export default function SoalForm({
       idSoal = data.id_soal
     }
 
-    if (tipeSoal === "pg" && idSoal) {
-      const opsiInsert = opsi
-        .filter((item) => item.isi_opsi.trim() || item.gambar_url)
-        .map((item) => ({
-          id_soal: idSoal,
-          label: item.label,
-          isi_opsi: item.isi_opsi || "-",
-          gambar_url: item.gambar_url || null,
-          is_benar: item.is_benar,
-        }))
+    if (idSoal) {
+      const suksesSimpanOpsi = await simpanOpsi(idSoal)
 
-      const { error } = await supabase
-        .from("opsi_jawaban")
-        .insert(opsiInsert)
-
-      if (error) {
-        alert(error.message)
-        setSaving(false)
-        return
-      }
+      if (!suksesSimpanOpsi) return
     }
 
     alert(editSoal ? "Soal berhasil diupdate" : "Soal berhasil disimpan")
@@ -221,6 +291,10 @@ export default function SoalForm({
         {editSoal ? "Edit Soal" : "Tambah Soal"}
       </h2>
 
+      <p className="mt-1 text-sm text-slate-500">
+        Mapel: <b>{selectedMapelName || "-"}</b>
+      </p>
+
       <form onSubmit={handleSubmit} className="mt-4 space-y-6">
         <div
           className={`grid gap-6 ${
@@ -228,22 +302,6 @@ export default function SoalForm({
           }`}
         >
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Mapel</label>
-              <select
-                value={idMapel}
-                onChange={(e) => setIdMapel(e.target.value)}
-                className="mt-2 w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
-              >
-                <option value="">Pilih Mapel</option>
-                {mapelList.map((mapel) => (
-                  <option key={mapel.id_mapel} value={mapel.id_mapel}>
-                    {mapel.nama_mapel}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             <div>
               <label className="text-sm font-medium">Tipe Soal</label>
               <select

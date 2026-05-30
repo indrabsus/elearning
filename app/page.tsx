@@ -125,14 +125,32 @@ export default function LoginPage() {
     }
 
     if (profile.role === "siswa") {
-      if (!profile.nisn) {
-        router.push("/verifikasi-siswa")
-        return
-      }
+  if (!profile.nisn) {
+    router.push("/verifikasi-siswa")
+    return
+  }
 
-      router.push("/siswa/dashboard")
-      return
-    }
+  const { data: siswaKelas, error: siswaKelasError } = await supabase
+    .from("siswa_kelas")
+    .select("id_siswa_kelas, id_kelas, status")
+    .eq("nisn", profile.nisn)
+    .eq("id_tahun_ajaran", selectedTahunAjaran)
+    .maybeSingle()
+
+  if (siswaKelasError) {
+    setError(siswaKelasError.message)
+    setLoading(false)
+    return
+  }
+
+  if (!siswaKelas || !siswaKelas.id_kelas) {
+    router.push("/verifikasi-siswa?mode=kelas")
+    return
+  }
+
+  router.push("/siswa/dashboard")
+  return
+}
 
     if (profile.role === "guru") {
       if (!profile.uid_guru) {

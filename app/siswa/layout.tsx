@@ -7,13 +7,13 @@ import {
   FileText,
   CalendarDays,
   User,
-  LibraryBig,
+  BarChart3,
 } from "lucide-react"
 
 import Header from "@/components/layout/Header"
 import Sidebar from "@/components/layout/Sidebar"
 
-export default function GuruLayout({
+export default function SiswaLayout({
   children,
 }: {
   children: React.ReactNode
@@ -23,32 +23,27 @@ export default function GuruLayout({
   const menus = [
     {
       label: "Dashboard",
-      href: "/guru/dashboard",
+      href: "/siswa/dashboard",
       icon: <Home size={18} />,
     },
     {
       label: "Materi",
-      href: "/guru/materi",
+      href: "/siswa/materi",
       icon: <BookOpen size={18} />,
     },
     {
       label: "Tugas",
-      href: "/guru/tugas",
+      href: "/siswa/tugas",
       icon: <FileText size={18} />,
     },
     {
-      label: "Bank Soal",
-      href: "/guru/bank-soal",
-      icon: <LibraryBig size={18} />,
-    },
-    {
-      label: "Nilai",
-      href: "/guru/nilai",
-      icon: <CalendarDays size={18} />,
-    },
+  label: "Nilai",
+  href: "/siswa/nilai",
+  icon: <BarChart3 size={18} />,
+},
     {
       label: "Profil",
-      href: "/guru/profil",
+      href: "/siswa/profil",
       icon: <User size={18} />,
     },
   ]
@@ -56,7 +51,7 @@ export default function GuruLayout({
   return (
     <div className="flex min-h-screen bg-slate-100 text-slate-900 dark:bg-slate-950 dark:text-white">
       <Sidebar
-        title="Guru"
+        title="Siswa"
         menus={menus}
         open={open}
         setOpen={setOpen}
@@ -64,7 +59,7 @@ export default function GuruLayout({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Header
-          title="Dashboard Guru"
+          title="Dashboard Siswa"
           onMenuClick={() => setOpen(true)}
         />
 
