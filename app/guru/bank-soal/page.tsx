@@ -20,24 +20,32 @@ export type OpsiForm = {
   is_benar: boolean
 }
 
-export type BankSoal = {
-  id_soal: string
-  id_mapel: string | null
-  uid_guru: number | null
-  pertanyaan: string
-  tipe_soal: string | null
-  tingkat_kesulitan: string | null
-  pembahasan: string | null
-  gambar_url: string | null
-  audio_url: string | null
-  created_at: string | null
-  mapel: Mapel | null
-  opsi_jawaban: OpsiForm[]
-}
+type BankSoal = {
+  id_soal: string;
+  id_mapel: string;
+  uid_guru: string;
+  pertanyaan: string;
+  tipe_soal: string;
+  tingkat_kesulitan: string | null;
+  pembahasan: string | null;
+  gambar_url: string | null;
+  audio_url: string | null;
+  created_at: string;
+  mapel: Mapel[] | null;
+  opsi_jawaban: OpsiJawaban[];
+};
+
+type OpsiJawaban = {
+  id_opsi: string;
+  label: string;
+  isi_opsi: string;
+  is_benar: boolean | null;
+  gambar_url: string | null;
+};
 
 type MengajarMapel = {
   id_mapel: string | null
-  mapel: Mapel | null
+  mapel: Mapel[] | null
 }
 
 const ITEMS_PER_PAGE = 10
@@ -95,7 +103,7 @@ export default function BankSoalPage() {
       return
     }
 
-    setSoalList((data ?? []) as BankSoal[])
+    setSoalList((data ?? []) as unknown as BankSoal[])
   }
 
   const initPage = async () => {
@@ -222,7 +230,7 @@ export default function BankSoalPage() {
 
     return (
       item.pertanyaan.toLowerCase().includes(keyword) ||
-      String(item.mapel?.nama_mapel ?? "")
+      String(item.mapel?.[0]?.nama_mapel ?? "")
         .toLowerCase()
         .includes(keyword) ||
       String(item.tipe_soal ?? "")
