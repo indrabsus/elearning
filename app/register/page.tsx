@@ -127,7 +127,6 @@ export default function RegisterPage() {
                 onChange={(e) => setRole(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                <option value="admin">Admin</option>
                 <option value="guru">Guru</option>
                 <option value="siswa">Siswa</option>
               </select>
