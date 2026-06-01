@@ -440,7 +440,7 @@ export default function GuruNilaiPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <div>
         <h1 className="text-2xl font-bold">Nilai Siswa</h1>
         <p className="text-slate-500 dark:text-slate-400">
@@ -470,7 +470,7 @@ export default function GuruNilaiPage() {
         </select>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="rounded-2xl border bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <h2 className="text-lg font-semibold">
             Daftar Tugas

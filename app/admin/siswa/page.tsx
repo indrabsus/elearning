@@ -11,31 +11,76 @@ import {
 import { supabase } from "@/lib/supabase";
 
 type Siswa = {
-  nisn: string;
-  nama_lengkap: string | null;
-  tempat_lahir: string | null;
-  tanggal_lahir: string | null;
-  jenkel: string | null;
-  agama: string | null;
-  tahun_masuk: number | null;
-  created_at?: string;
-};
+  nisn: string
+  nama_lengkap: string | null
+  tempat_lahir: string | null
+  tanggal_lahir: string | null
+  jenkel: string | null
+  agama: string | null
+  tahun_masuk: number | null
+  created_at?: string
+  kelas_text?: string
+}
 
 const ITEMS_PER_PAGE = 10;
 
 const getSiswaData = async (): Promise<Siswa[]> => {
-  const { data, error } = await supabase
+  const idTahunAjaran =
+    localStorage.getItem("id_tahun_ajaran") || ""
+
+  const { data: siswaData, error: siswaError } = await supabase
     .from("siswa")
     .select("*")
-    .order("nama_lengkap", { ascending: true });
+    .order("nama_lengkap", { ascending: true })
 
-  if (error) {
-    console.error(error.message);
-    return [];
+  if (siswaError) {
+    console.error(siswaError.message)
+    return []
   }
 
-  return data ?? [];
-};
+  if (!idTahunAjaran) {
+    return siswaData ?? []
+  }
+
+  const { data: siswaKelasData, error: siswaKelasError } = await supabase
+    .from("siswa_kelas")
+    .select(`
+      nisn,
+      id_kelas,
+      status,
+      kelas:id_kelas (
+        tingkat,
+        nama_kelas
+      )
+    `)
+    .eq("id_tahun_ajaran", idTahunAjaran)
+    .eq("status", "aktif")
+
+  if (siswaKelasError) {
+    console.error(siswaKelasError.message)
+    return siswaData ?? []
+  }
+
+  const kelasMap = new Map<string, string>()
+
+  ;(siswaKelasData ?? []).forEach((item: any) => {
+    const kelas = Array.isArray(item.kelas)
+      ? item.kelas[0]
+      : item.kelas
+
+    kelasMap.set(
+      item.nisn,
+      kelas
+        ? `${kelas.tingkat ?? "-"} ${kelas.nama_kelas ?? "-"}`
+        : "-"
+    )
+  })
+
+  return (siswaData ?? []).map((item) => ({
+    ...item,
+    kelas_text: kelasMap.get(item.nisn) ?? "Belum dapat kelas",
+  }))
+}
 
 const formatTanggal = (tanggal: string | null) => {
   if (!tanggal) return "-";
@@ -203,17 +248,14 @@ export default function KelolaSiswaPage() {
     const keyword = search.toLowerCase();
 
     return (
-      String(item.nisn ?? "").toLowerCase().includes(keyword) ||
-      String(item.nama_lengkap ?? "")
-        .toLowerCase()
-        .includes(keyword) ||
-      String(item.tempat_lahir ?? "")
-        .toLowerCase()
-        .includes(keyword) ||
-      String(item.jenkel ?? "").toLowerCase().includes(keyword) ||
-      String(item.agama ?? "").toLowerCase().includes(keyword) ||
-      String(item.tahun_masuk ?? "").includes(keyword)
-    );
+  String(item.nisn ?? "").toLowerCase().includes(keyword) ||
+  String(item.nama_lengkap ?? "").toLowerCase().includes(keyword) ||
+  String(item.kelas_text ?? "").toLowerCase().includes(keyword) ||
+  String(item.tempat_lahir ?? "").toLowerCase().includes(keyword) ||
+  String(item.jenkel ?? "").toLowerCase().includes(keyword) ||
+  String(item.agama ?? "").toLowerCase().includes(keyword) ||
+  String(item.tahun_masuk ?? "").includes(keyword)
+)
   });
 
   const sortedSiswa = [...filteredSiswa].sort((a, b) => {
@@ -241,7 +283,7 @@ export default function KelolaSiswaPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
           Kelola Siswa
@@ -252,7 +294,7 @@ export default function KelolaSiswaPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
             {editId ? "Edit Siswa" : "Tambah Siswa"}
@@ -372,7 +414,7 @@ export default function KelolaSiswaPage() {
               />
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 type="submit"
                 disabled={saving}
@@ -424,7 +466,68 @@ export default function KelolaSiswaPage() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
+          <div className="mt-5 space-y-4 md:hidden">
+  {loading ? (
+    <div className="rounded-xl border p-6 text-center text-gray-500">
+      Loading data...
+    </div>
+  ) : paginatedSiswa.length === 0 ? (
+    <div className="rounded-xl border p-6 text-center text-gray-500">
+      Data siswa belum ada.
+    </div>
+  ) : (
+    paginatedSiswa.map((item, index) => (
+      <div
+        key={item.nisn}
+        className="rounded-xl border p-4 shadow-sm dark:border-gray-800"
+      >
+        <p className="break-words font-semibold">
+          {index + 1}. {item.nama_lengkap || "-"}
+        </p>
+
+        <div className="mt-3 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+          <p><b>NISN:</b> {item.nisn}</p>
+          <p>
+  <b>Kelas:</b>{" "}
+  <span
+    className={
+      item.kelas_text === "Belum dapat kelas"
+        ? "text-red-600 font-semibold"
+        : "text-green-600 font-semibold"
+    }
+  >
+    {item.kelas_text ?? "Belum dapat kelas"}
+  </span>
+</p>
+          <p><b>TTL:</b> {item.tempat_lahir || "-"}, {formatTanggal(item.tanggal_lahir)}</p>
+          <p><b>JK:</b> {item.jenkel || "-"}</p>
+          <p><b>Agama:</b> {item.agama || "-"}</p>
+          <p><b>Tahun Masuk:</b> {item.tahun_masuk || "-"}</p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => handleEdit(item)}
+            className="rounded-lg bg-yellow-500 py-2 text-sm text-white"
+          >
+            Edit
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleDelete(item.nisn)}
+            className="rounded-lg bg-red-600 py-2 text-sm text-white"
+          >
+            Hapus
+          </button>
+        </div>
+      </div>
+    ))
+  )}
+</div>
+
+          <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left dark:border-gray-800">
@@ -441,6 +544,18 @@ export default function KelolaSiswaPage() {
                       className="inline-flex items-center gap-1 hover:text-blue-600"
                     >
                       NISN
+                      <ArrowUpDown size={14} />
+                    </button>
+                  </th>
+                  <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSort("kelas_text")
+                      }
+                      className="inline-flex items-center gap-1 hover:text-blue-600"
+                    >
+                      Kelas
                       <ArrowUpDown size={14} />
                     </button>
                   </th>
@@ -518,6 +633,13 @@ export default function KelolaSiswaPage() {
 
                       <td className="py-3 pr-4 font-medium text-gray-800 dark:text-white">
                         {item.nisn}
+                      </td>
+                      <td className="py-3 pr-4 font-medium text-gray-800 dark:text-white">
+                        {item.kelas_text === "Belum dapat kelas" ? (
+                          <span className="text-red-500">-</span>
+                        ) : (
+                          item.kelas_text
+                        )}
                       </td>
 
                       <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">

@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   Home,
   Layers3,
@@ -12,13 +13,42 @@ import {
 
 import Header from "@/components/layout/Header"
 import Sidebar from "@/components/layout/Sidebar"
+import { supabase } from "@/lib/supabase"
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    const checkAdmin = async () => {
+      const { data: userData } = await supabase.auth.getUser()
+
+      if (!userData.user) {
+        router.replace("/")
+        return
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userData.user.id)
+        .single()
+
+      if (!profile || profile.role !== "admin") {
+        router.replace("/")
+        return
+      }
+
+      setChecking(false)
+    }
+
+    checkAdmin()
+  }, [router])
 
   const menus = [
     {
@@ -52,6 +82,14 @@ export default function AdminLayout({
       icon: <ClipboardList size={18} />,
     },
   ]
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-gray-950">
+        Mengecek akses...
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-100 dark:bg-gray-950">

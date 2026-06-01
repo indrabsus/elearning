@@ -8,6 +8,7 @@ import {
   CalendarDays,
   User,
   LibraryBig,
+  ClipboardList,
 } from "lucide-react"
 
 import Header from "@/components/layout/Header"
@@ -50,6 +51,11 @@ export default function GuruLayout({
       label: "Profil",
       href: "/guru/profil",
       icon: <User size={18} />,
+    },
+     {
+      label: "Pembagian Mengajar",
+      href: "/guru/pembagian-mengajar",
+      icon: <ClipboardList size={18} />,
     },
   ]
 

@@ -13,7 +13,6 @@ type HeaderProps = {
 }
 
 export default function Header({
-  title,
   onMenuClick,
 }: HeaderProps) {
   const router = useRouter()
@@ -56,7 +55,6 @@ export default function Header({
 
         <div>
           <h1 className="font-semibold">
-            {title}
           </h1>
 
           <p className="text-xs text-slate-500">

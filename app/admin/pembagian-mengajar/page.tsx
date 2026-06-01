@@ -26,9 +26,9 @@ type PembagianMengajar = {
   id_mapel: string;
   id_kelas: string;
   id_tahun_ajaran: string;
-  guru: Guru[] | null;
-  mapel: Mapel[] | null;
-  kelas: Kelas[] | null;
+  guru: Guru | null;
+  mapel: Mapel | null;
+  kelas: Kelas | null;
 };
 
 const ITEMS_PER_PAGE = 10;
@@ -224,9 +224,9 @@ export default function PembagianMengajarPage() {
   const filteredData = dataMengajar.filter((item) => {
     const keyword = search.toLowerCase();
 
-    const guru = item.guru?.[0];
-    const mapel = item.mapel?.[0];
-    const kelas = item.kelas?.[0];
+   const guru = item.guru;
+const mapel = item.mapel;
+const kelas = item.kelas;
 
     return (
       String(guru?.nama_lengkap ?? "").toLowerCase().includes(keyword) ||
@@ -237,9 +237,9 @@ export default function PembagianMengajarPage() {
   });
 
   const getSortValue = (item: PembagianMengajar) => {
-    const guru = item.guru?.[0];
-    const mapel = item.mapel?.[0];
-    const kelas = item.kelas?.[0];
+    const guru = item.guru;
+    const mapel = item.mapel;
+    const kelas = item.kelas;
 
     if (sortKey === "guru") return guru?.nama_lengkap ?? "";
     if (sortKey === "mapel") return mapel?.nama_mapel ?? "";
@@ -440,9 +440,9 @@ export default function PembagianMengajarPage() {
                   </tr>
                 ) : (
                   paginatedData.map((item, index) => {
-                    const guru = item.guru?.[0];
-                    const mapel = item.mapel?.[0];
-                    const kelas = item.kelas?.[0];
+                   const guru = item.guru;
+                  const mapel = item.mapel;
+                  const kelas = item.kelas;
 
                     return (
                       <tr

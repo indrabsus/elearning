@@ -169,11 +169,6 @@ export default function GuruDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-slate-500 dark:text-slate-400">
-          Tahun Ajaran: {namaTahunAjaran || "-"}
-        </h1>
-      </div>
 
       <div className="grid gap-4 md:grid-cols-4">
         <StatCard

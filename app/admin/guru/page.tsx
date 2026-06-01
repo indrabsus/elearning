@@ -7,16 +7,17 @@ import {
   Trash2,
   Search,
   ArrowUpDown,
-} from "lucide-react";
-
+  KeyRound,
+} from "lucide-react"
 import { supabase } from "@/lib/supabase";
 
 type Guru = {
-  uid: string;
-  nama_lengkap: string | null;
-  no_hp: string | null;
-  created_at?: string;
-};
+  uid: string
+  nama_lengkap: string | null
+  no_hp: string | null
+  created_at?: string
+  email?: string | null
+}
 
 const ITEMS_PER_PAGE = 10;
 
@@ -33,6 +34,42 @@ const getGuruData = async (): Promise<Guru[]> => {
 
   return data ?? [];
 };
+
+const handleResetPassword = async (uid: string) => {
+  const yakin = confirm(
+    "Reset password guru menjadi 123456?"
+  )
+
+  if (!yakin) return
+
+  try {
+    const res = await fetch(
+      "/api/admin/reset-password",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          uid,
+        }),
+      }
+    )
+
+    const result = await res.json()
+
+    if (!res.ok) {
+      alert(result.error)
+      return
+    }
+
+    alert(
+      "Password berhasil direset menjadi 123456"
+    )
+  } catch {
+    alert("Gagal reset password")
+  }
+}
 
 export default function KelolaGuruPage() {
   const [guru, setGuru] = useState<Guru[]>([]);
@@ -56,14 +93,37 @@ export default function KelolaGuruPage() {
     useState<"asc" | "desc">("asc");
 
   const reloadGuru = async () => {
-    setLoading(true);
+  setLoading(true)
 
-    const data = await getGuruData();
+  const data = await getGuruData()
 
-    setGuru(data);
+  try {
+    const res = await fetch("/api/admin/guru-emails")
+    const result = await res.json()
 
-    setLoading(false);
-  };
+    const emails: {
+      uid_guru: string
+      email: string | null
+    }[] = result.data ?? []
+
+    const finalData = data.map((guru) => {
+      const found = emails.find(
+        (item) => String(item.uid_guru) === String(guru.uid)
+      )
+
+      return {
+        ...guru,
+        email: found?.email ?? null,
+      }
+    })
+
+    setGuru(finalData)
+  } catch {
+    setGuru(data)
+  }
+
+  setLoading(false)
+}
 
   useEffect(() => {
     reloadGuru();
@@ -212,7 +272,7 @@ export default function KelolaGuruPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
           Kelola Guru
@@ -223,7 +283,7 @@ export default function KelolaGuruPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
           <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
             {editId ? "Edit Guru" : "Tambah Guru"}
@@ -278,7 +338,7 @@ export default function KelolaGuruPage() {
               />
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 type="submit"
                 disabled={saving}
@@ -330,13 +390,70 @@ export default function KelolaGuruPage() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
+<div className="mt-5 space-y-4 md:hidden">
+  {loading ? (
+    <div className="rounded-xl border p-6 text-center text-gray-500">
+      Loading data...
+    </div>
+  ) : paginatedGuru.length === 0 ? (
+    <div className="rounded-xl border p-6 text-center text-gray-500">
+      Data guru belum ada.
+    </div>
+  ) : (
+    paginatedGuru.map((item, index) => (
+      <div
+        key={item.uid}
+        className="rounded-xl border p-4 shadow-sm dark:border-gray-800"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-semibold break-words">
+              {index + 1}. {item.nama_lengkap || "-"}
+            </p>
+            <p className="text-xs text-gray-500">
+              UID: {item.uid}
+            </p>
+
+          </div>
+        </div>
+<p className="mt-1 text-sm">
+  <b>Email:</b> {item.email ?? "-"}
+</p>
+        <p className="mt-3 text-sm">
+          <b>No HP:</b> {item.no_hp || "-"}
+        </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => handleEdit(item)}
+            className="rounded-lg bg-yellow-500 py-2 text-sm text-white"
+          >
+            Edit
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleDelete(item.uid)}
+            className="rounded-lg bg-red-600 py-2 text-sm text-white"
+          >
+            Hapus
+          </button>
+        </div>
+      </div>
+    ))
+  )}
+</div>
+          <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-gray-200 text-left dark:border-gray-800">
                   <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
                     No
                   </th>
+                  <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
+  Email
+</th>
 
                   <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
                     <button
@@ -398,7 +515,7 @@ export default function KelolaGuruPage() {
                 ) : paginatedGuru.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="py-6 text-center text-gray-500 dark:text-gray-400"
                     >
                       Data guru belum ada.
@@ -417,6 +534,9 @@ export default function KelolaGuruPage() {
                             index +
                             1}
                         </td>
+                        <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
+                          {item.email ?? "-"}
+                        </td>
 
                         <td className="py-3 pr-4 font-medium text-gray-800 dark:text-white">
                           {item.uid}
@@ -432,6 +552,14 @@ export default function KelolaGuruPage() {
 
                         <td className="py-3 pr-4">
                           <div className="flex gap-2">
+                            <button
+  type="button"
+  onClick={() => handleResetPassword(item.uid)}
+  className="rounded-lg bg-blue-100 p-2 text-blue-700 hover:bg-blue-200"
+  title="Reset Password"
+>
+  <KeyRound size={16} />
+</button>
                             <button
                               type="button"
                               onClick={() =>

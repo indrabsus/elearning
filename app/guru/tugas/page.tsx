@@ -320,7 +320,7 @@ export default function GuruTugasPage() {
     const mapel = firstItem(mengajar?.mapel)
     const kelas = firstItem(mengajar?.kelas)
 
-    return { mengajar, mapel, kelas }
+    return { mapel, kelas }
   }
 
   const filteredTugas = tugasList.filter((item) => {
@@ -387,7 +387,7 @@ export default function GuruTugasPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-x-hidden">
       <div>
         <h1 className="text-2xl font-bold">Kelola Tugas</h1>
         <p className="text-slate-500 dark:text-slate-400">
@@ -395,8 +395,8 @@ export default function GuruTugasPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
-        <div className="rounded-2xl border bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="rounded-2xl border bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
           <h2 className="text-lg font-semibold">
             {editId ? "Edit Tugas" : "Tambah Tugas"}
           </h2>
@@ -410,7 +410,7 @@ export default function GuruTugasPage() {
               <select
                 value={idMengajar}
                 onChange={(e) => setIdMengajar(e.target.value)}
-                className="mt-2 w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
+                className="mt-2 w-full max-w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
               >
                 <option value="">Pilih Mapel dan Kelas</option>
                 {mengajarList.map((item) => (
@@ -431,7 +431,7 @@ export default function GuruTugasPage() {
                 value={judul}
                 onChange={(e) => setJudul(e.target.value)}
                 placeholder="Contoh: Tugas Procedure Text"
-                className="mt-2 w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
+                className="mt-2 w-full max-w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
               />
             </div>
 
@@ -443,7 +443,7 @@ export default function GuruTugasPage() {
               <select
                 value={tipeTugas}
                 onChange={(e) => setTipeTugas(e.target.value)}
-                className="mt-2 w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
+                className="mt-2 w-full max-w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
               >
                 <option value="essay">Essay</option>
                 <option value="upload_file">Upload File</option>
@@ -461,7 +461,7 @@ export default function GuruTugasPage() {
                 onChange={(e) => setDeskripsi(e.target.value)}
                 rows={4}
                 placeholder="Tulis instruksi tugas..."
-                className="mt-2 w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
+                className="mt-2 w-full max-w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
               />
             </div>
 
@@ -474,7 +474,7 @@ export default function GuruTugasPage() {
                 type="datetime-local"
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
-                className="mt-2 w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
+                className="mt-2 w-full max-w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
               />
             </div>
 
@@ -484,7 +484,7 @@ export default function GuruTugasPage() {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="mt-2 w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
+                className="mt-2 w-full max-w-full rounded-xl border bg-white px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
               >
                 <option value="aktif">Aktif</option>
                 <option value="draft">Draft</option>
@@ -492,11 +492,11 @@ export default function GuruTugasPage() {
               </select>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                className="inline-flex w-full flex-1 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
               >
                 <Plus size={18} />
                 {saving ? "Menyimpan..." : editId ? "Update" : "Tambah"}
@@ -506,7 +506,7 @@ export default function GuruTugasPage() {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="rounded-xl border px-4 py-2 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                  className="w-full rounded-xl border px-4 py-2 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800 sm:w-auto"
                 >
                   Batal
                 </button>
@@ -515,11 +515,11 @@ export default function GuruTugasPage() {
           </form>
         </div>
 
-        <div className="rounded-2xl border bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 xl:col-span-2">
+        <div className="min-w-0 rounded-2xl border bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5 xl:col-span-2">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold">Data Tugas</h2>
 
-            <div className="relative">
+            <div className="relative w-full sm:w-72">
               <Search
                 size={18}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -529,12 +529,101 @@ export default function GuruTugasPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Cari tugas..."
-                className="w-full rounded-xl border bg-white py-2 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950 sm:w-72"
+                className="w-full rounded-xl border bg-white py-2 pl-10 pr-4 outline-none focus:ring-2 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-950"
               />
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
+          <div className="mt-5 space-y-4 md:hidden">
+            {paginatedTugas.length === 0 ? (
+              <div className="rounded-xl border p-6 text-center text-slate-500 dark:border-slate-800">
+                Data tugas belum ada.
+              </div>
+            ) : (
+              paginatedTugas.map((item) => {
+                const { mapel, kelas } = getTugasRelasi(item)
+
+                return (
+                  <div
+                    key={item.id_tugas}
+                    className="rounded-xl border p-4 shadow-sm dark:border-slate-800"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="break-words text-base font-semibold">
+                          {item.judul}
+                        </h3>
+                        <p className="mt-1 line-clamp-2 break-words text-sm text-slate-500">
+                          {item.deskripsi || "-"}
+                        </p>
+                      </div>
+
+                      <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs capitalize dark:bg-slate-800">
+                        {item.status ?? "-"}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 space-y-1 text-sm text-slate-600 dark:text-slate-300">
+                      <p>
+                        <b>Mapel:</b> {mapel?.nama_mapel ?? "-"}
+                      </p>
+                      <p>
+                        <b>Kelas:</b>{" "}
+                        {kelas
+                          ? `${kelas.tingkat ?? "-"} ${
+                              kelas.nama_kelas ?? "-"
+                            }`
+                          : "-"}
+                      </p>
+                      <p className="capitalize">
+                        <b>Tipe:</b>{" "}
+                        {String(item.tipe_tugas ?? "-").replace("_", " ")}
+                      </p>
+                      <p>
+                        <b>Deadline:</b> {formatTanggal(item.deadline)}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      {item.tipe_tugas === "pilihan_ganda" && (
+                        <Link
+                          href={`/guru/tugas/${item.id_tugas}/soal`}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"
+                        >
+                          <ListChecks size={16} />
+                          Soal
+                        </Link>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(item)}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-yellow-500 px-3 py-2 text-sm text-white"
+                      >
+                        <Pencil size={16} />
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id_tugas)}
+                        className={`inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm text-white ${
+                          item.tipe_tugas === "pilihan_ganda"
+                            ? "col-span-2"
+                            : ""
+                        }`}
+                      >
+                        <Trash2 size={16} />
+                        Hapus
+                      </button>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b text-left dark:border-slate-800">
@@ -689,7 +778,7 @@ export default function GuruTugasPage() {
               Total data: {filteredTugas.length}
             </p>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 disabled={page === 1}

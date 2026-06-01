@@ -477,112 +477,173 @@ export default function KelolaMateriPage() {
             </div>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b text-left dark:border-slate-800">
-                  <th className="py-3 pr-4 text-slate-500">No</th>
-                  <th className="py-3 pr-4 text-slate-500">Materi</th>
-                  <th className="py-3 pr-4 text-slate-500">Mapel</th>
-                  <th className="py-3 pr-4 text-slate-500">Kelas</th>
-                  <th className="py-3 pr-4 text-slate-500">URL</th>
-                  <th className="py-3 pr-4 text-slate-500">Aksi</th>
-                </tr>
-              </thead>
+          {/* MOBILE */}
+<div className="mt-5 space-y-4 md:hidden">
+  {loading ? (
+    <div className="rounded-xl border p-6 text-center">
+      Loading data...
+    </div>
+  ) : filteredMateri.length === 0 ? (
+    <div className="rounded-xl border p-6 text-center">
+      Data materi belum ada.
+    </div>
+  ) : (
+    filteredMateri.map((item) => {
+      const mengajar = firstItem(item.mapel_kelas_guru)
+      const mapel = firstItem(mengajar?.mapel)
+      const kelas = firstItem(mengajar?.kelas)
 
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="py-6 text-center text-slate-500">
-                      Loading data...
-                    </td>
-                  </tr>
-                ) : filteredMateri.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-6 text-center text-slate-500">
-                      Data materi belum ada.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredMateri.map((item, index) => {
-                    const mengajar = firstItem(item.mapel_kelas_guru)
-                    const mapel = firstItem(mengajar?.mapel)
-                    const kelas = firstItem(mengajar?.kelas)
+      return (
+        <div
+          key={item.id_materi}
+          className="rounded-xl border p-4 shadow-sm"
+        >
+          <div className="space-y-2">
+            <h3 className="font-semibold text-lg">
+              {item.nama_materi}
+            </h3>
 
-                    return (
-                      <tr
-                        key={item.id_materi}
-                        className="border-b dark:border-slate-800"
-                      >
-                        <td className="py-3 pr-4">{index + 1}</td>
+            <p className="text-sm text-slate-500">
+              {item.deskripsi || "-"}
+            </p>
 
-                        <td className="min-w-56 py-3 pr-4 font-medium">
-                          <p>{item.nama_materi}</p>
-                          <p className="line-clamp-1 text-xs text-slate-500">
-                            {item.deskripsi || "-"}
-                          </p>
+            <div className="text-sm space-y-1">
+              <p>
+                <b>Mapel:</b> {mapel?.nama_mapel ?? "-"}
+              </p>
 
-                          {item.url && isYoutubeUrl(item.url) && (
-                            <span className="mt-1 inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600 dark:bg-red-950 dark:text-red-300">
-                              YouTube Video
-                            </span>
-                          )}
-                        </td>
+              <p>
+                <b>Kelas:</b>{" "}
+                {kelas
+                  ? `${kelas.tingkat} ${kelas.nama_kelas}`
+                  : "-"}
+              </p>
 
-                        <td className="py-3 pr-4">
-                          {mapel?.nama_mapel ?? "-"}
-                        </td>
-
-                        <td className="py-3 pr-4">
-                          {kelas
-                            ? `${kelas.tingkat ?? "-"} ${
-                                kelas.nama_kelas ?? "-"
-                              }`
-                            : "-"}
-                        </td>
-
-                        <td className="py-3 pr-4">
-                          {item.url ? (
-                            <a
-                              href={item.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-blue-600 hover:underline"
-                            >
-                              Buka
-                              <ExternalLink size={14} />
-                            </a>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-
-                        <td className="py-3 pr-4">
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(item)}
-                              className="rounded-lg bg-yellow-100 p-2 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-950 dark:text-yellow-300"
-                            >
-                              <Pencil size={16} />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(item.id_materi)}
-                              className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })
+              <p>
+                <b>Tanggal:</b>{" "}
+                {new Date(item.created_at).toLocaleDateString(
+                  "id-ID"
                 )}
-              </tbody>
-            </table>
+              </p>
+            </div>
+
+            {item.url && (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-blue-600"
+              >
+                <ExternalLink size={16} />
+                Buka Materi
+              </a>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <button
+                onClick={() => handleEdit(item)}
+                className="rounded-lg bg-yellow-500 py-2 text-white"
+              >
+                Edit
+              </button>
+
+              <button
+                onClick={() => handleDelete(item.id_materi)}
+                className="rounded-lg bg-red-500 py-2 text-white"
+              >
+                Hapus
+              </button>
+            </div>
           </div>
+        </div>
+      )
+    })
+  )}
+</div>
+
+{/* DESKTOP */}
+<div className="mt-5 hidden md:block overflow-x-auto">
+  <table className="w-full border-collapse text-sm">
+    <thead>
+      <tr className="border-b text-left dark:border-slate-800">
+        <th className="py-3 pr-4">No</th>
+        <th className="py-3 pr-4">Materi</th>
+        <th className="py-3 pr-4">Mapel</th>
+        <th className="py-3 pr-4">Kelas</th>
+        <th className="py-3 pr-4">URL</th>
+        <th className="py-3 pr-4">Aksi</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {filteredMateri.map((item, index) => {
+        const mengajar = firstItem(item.mapel_kelas_guru)
+        const mapel = firstItem(mengajar?.mapel)
+        const kelas = firstItem(mengajar?.kelas)
+
+        return (
+          <tr
+            key={item.id_materi}
+            className="border-b dark:border-slate-800"
+          >
+            <td className="py-3 pr-4">
+              {index + 1}
+            </td>
+
+            <td className="py-3 pr-4">
+              {item.nama_materi}
+            </td>
+
+            <td className="py-3 pr-4">
+              {mapel?.nama_mapel ?? "-"}
+            </td>
+
+            <td className="py-3 pr-4">
+              {kelas
+                ? `${kelas.tingkat} ${kelas.nama_kelas}`
+                : "-"}
+            </td>
+
+            <td className="py-3 pr-4">
+              {item.url ? (
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600"
+                >
+                  Buka
+                </a>
+              ) : (
+                "-"
+              )}
+            </td>
+
+            <td className="py-3 pr-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleEdit(item)}
+                  className="rounded-lg bg-yellow-100 p-2"
+                >
+                  <Pencil size={16} />
+                </button>
+
+                <button
+                  onClick={() =>
+                    handleDelete(item.id_materi)
+                  }
+                  className="rounded-lg bg-red-100 p-2"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </td>
+          </tr>
+        )
+      })}
+    </tbody>
+  </table>
+</div>
 
           <p className="mt-4 text-sm text-slate-500">
             Total data: {filteredMateri.length}
