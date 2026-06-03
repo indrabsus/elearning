@@ -22,7 +22,7 @@ type Kelas = {
 }
 
 type Siswa = {
-  nisn: string
+  id_siswa: string
   nama_lengkap: string | null
   tempat_lahir: string | null
   tanggal_lahir: string | null
@@ -31,10 +31,9 @@ type Siswa = {
 
 type SiswaKelas = {
   id_siswa_kelas: string
-  nisn: string
+  id_siswa: string
   id_kelas: string
   id_tahun_ajaran: string
-  status: string | null
   siswa: Siswa | Siswa[] | null
   kelas: {
     tingkat: number | null
@@ -106,10 +105,10 @@ export default function KelolaKelasPage() {
     }
 
     const { data: siswaKelasData, error: siswaKelasError } = await supabase
-      .from("siswa_kelas")
-      .select("id_kelas")
-      .eq("id_tahun_ajaran", tahunId)
-      .eq("status", "aktif")
+  .from("siswa_kelas")
+  .select("id_siswa_kelas, id_kelas, id_siswa")
+  .eq("id_tahun_ajaran", tahunId)
+  .range(0, 5000)
 
     if (siswaKelasError) {
       alert(siswaKelasError.message)
@@ -230,96 +229,134 @@ export default function KelolaKelasPage() {
     await loadModalData(kelasItem.id_kelas)
   }
 
+  const fetchAll = async (
+  table: string,
+  selectQuery: string,
+  filter?: (query: any) => any,
+  orderColumn?: string
+) => {
+  const pageSize = 1000
+  let from = 0
+  let to = pageSize - 1
+  let allData: any[] = []
+
+  while (true) {
+    let query = supabase
+      .from(table)
+      .select(selectQuery)
+      .range(from, to)
+
+    if (filter) {
+      query = filter(query)
+    }
+
+    if (orderColumn) {
+      query = query.order(orderColumn, { ascending: true })
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      throw error
+    }
+
+    allData = [...allData, ...(data ?? [])]
+
+    if (!data || data.length < pageSize) {
+      break
+    }
+
+    from += pageSize
+    to += pageSize
+  }
+
+  return allData
+}
+
   const loadModalData = async (idKelas: string) => {
-    if (!idTahunAjaran) return
+  if (!idTahunAjaran) return
 
-    setLoadingModal(true)
+  setLoadingModal(true)
 
-    const [siswaRes, semuaSiswaKelasRes, anggotaRes] = await Promise.all([
-      supabase
-        .from("siswa")
-        .select("nisn, nama_lengkap, tempat_lahir, tanggal_lahir, jenkel")
-        .order("nama_lengkap", { ascending: true }),
+  try {
+    const [siswaData, semuaSiswaKelasData, anggotaData] =
+      await Promise.all([
+        fetchAll(
+          "siswa",
+          "id_siswa, nama_lengkap, tempat_lahir, tanggal_lahir, jenkel, nisn",
+          undefined,
+          "nama_lengkap"
+        ),
 
-      supabase
-        .from("siswa_kelas")
-        .select(`
-          id_siswa_kelas,
-          nisn,
-          id_kelas,
-          id_tahun_ajaran,
-          status,
-          kelas:id_kelas (
-            tingkat,
-            nama_kelas
-          )
-        `)
-        .eq("id_tahun_ajaran", idTahunAjaran)
-        .eq("status", "aktif"),
+        fetchAll(
+          "siswa_kelas",
+          `
+            id_siswa_kelas,
+            id_siswa,
+            id_kelas,
+            id_tahun_ajaran,
+            kelas:id_kelas (
+              tingkat,
+              nama_kelas
+            )
+          `,
+          (query) => query.eq("id_tahun_ajaran", idTahunAjaran)
+        ),
 
-      supabase
-        .from("siswa_kelas")
-        .select(`
-          id_siswa_kelas,
-          nisn,
-          id_kelas,
-          id_tahun_ajaran,
-          status,
-          siswa:nisn (
-            nisn,
-            nama_lengkap,
-            tempat_lahir,
-            tanggal_lahir,
-            jenkel
-          ),
-          kelas:id_kelas (
-            tingkat,
-            nama_kelas
-          )
-        `)
-        .eq("id_tahun_ajaran", idTahunAjaran)
-        .eq("id_kelas", idKelas)
-        .eq("status", "aktif"),
-    ])
+        fetchAll(
+          "siswa_kelas",
+          `
+            id_siswa_kelas,
+            id_siswa,
+            id_kelas,
+            id_tahun_ajaran,
+            siswa:id_siswa (
+              id_siswa,
+              nama_lengkap,
+              tempat_lahir,
+              tanggal_lahir,
+              jenkel,
+              nisn
+            ),
+            kelas:id_kelas (
+              tingkat,
+              nama_kelas
+            )
+          `,
+          (query) =>
+            query
+              .eq("id_tahun_ajaran", idTahunAjaran)
+              .eq("id_kelas", idKelas)
+        ),
+      ])
 
-    if (siswaRes.error) {
-      alert(siswaRes.error.message)
-      setLoadingModal(false)
-      return
-    }
+    console.log("total siswa:", siswaData.length)
+    console.log("total semua siswa_kelas:", semuaSiswaKelasData.length)
+    console.log("total anggota kelas:", anggotaData.length)
 
-    if (semuaSiswaKelasRes.error) {
-      alert(semuaSiswaKelasRes.error.message)
-      setLoadingModal(false)
-      return
-    }
-
-    if (anggotaRes.error) {
-      alert(anggotaRes.error.message)
-      setLoadingModal(false)
-      return
-    }
-
-    setSiswaList((siswaRes.data ?? []) as Siswa[])
-    setSemuaSiswaKelas((semuaSiswaKelasRes.data ?? []) as unknown as SiswaKelas[])
-    setAnggotaKelas((anggotaRes.data ?? []) as unknown as SiswaKelas[])
-
+    setSiswaList(siswaData as Siswa[])
+    setSemuaSiswaKelas(semuaSiswaKelasData as unknown as SiswaKelas[])
+    setAnggotaKelas(anggotaData as unknown as SiswaKelas[])
+  } catch (error: any) {
+    alert(error.message || "Gagal mengambil data")
+  } finally {
     setLoadingModal(false)
   }
+}
 
-  const getSiswaKelasAktif = (nisn: string) => {
-    return semuaSiswaKelas.find((item) => item.nisn === nisn)
+  const getSiswaKelasAktif = (idSiswa: string) => {
+    return semuaSiswaKelas.find((item) => item.id_siswa === idSiswa)
   }
 
-  const togglePilihSiswa = (nisn: string) => {
-    const dataKelasAktif = getSiswaKelasAktif(nisn)
+  const togglePilihSiswa = (idSiswa: string) => {
+    const dataKelasAktif = getSiswaKelasAktif(idSiswa)
 
     if (dataKelasAktif) return
 
     setSelectedSiswa((prev) =>
-      prev.includes(nisn)
-        ? prev.filter((item) => item !== nisn)
-        : [...prev, nisn]
+      prev.includes(idSiswa)
+        ? prev.filter((item) => item !== idSiswa)
+        : [...prev, idSiswa]
     )
   }
 
@@ -336,8 +373,8 @@ export default function KelolaKelasPage() {
       return
     }
 
-    const siswaSudahPunyaKelas = selectedSiswa.filter((nisn) =>
-      semuaSiswaKelas.some((item) => item.nisn === nisn)
+    const siswaSudahPunyaKelas = selectedSiswa.filter((idSiswa) =>
+      semuaSiswaKelas.some((item) => item.id_siswa === idSiswa)
     )
 
     if (siswaSudahPunyaKelas.length > 0) {
@@ -347,11 +384,10 @@ export default function KelolaKelasPage() {
 
     setSaving(true)
 
-    const insertData = selectedSiswa.map((nisn) => ({
-      nisn,
+    const insertData = selectedSiswa.map((idSiswa) => ({
+      id_siswa: idSiswa,
       id_kelas: selectedKelas.id_kelas,
       id_tahun_ajaran: idTahunAjaran,
-      status: "aktif",
     }))
 
     const { error } = await supabase.from("siswa_kelas").insert(insertData)
@@ -431,7 +467,7 @@ export default function KelolaKelasPage() {
 
     return siswaList.filter((item) => {
       return (
-        String(item.nisn ?? "").toLowerCase().includes(keyword) ||
+        String(item.id_siswa ?? "").toLowerCase().includes(keyword) ||
         String(item.nama_lengkap ?? "").toLowerCase().includes(keyword)
       )
     })
@@ -547,9 +583,15 @@ export default function KelolaKelasPage() {
                     {index + 1}. Kelas {item.tingkat} {item.nama_kelas}
                   </p>
 
-                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    Jumlah siswa: {item.jumlah_siswa ?? 0}
-                  </p>
+                  {kelas.map((item) => (
+  <div key={item.id_kelas}>
+    <h3>{item.nama_kelas}</h3>
+
+    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+      Jumlah siswa: {item.jumlah_siswa ?? 0}
+    </p>
+  </div>
+))}
 
                   <div className="mt-4 grid grid-cols-3 gap-2">
                     <button
@@ -786,10 +828,10 @@ export default function KelolaKelasPage() {
                         >
                           <div className="min-w-0">
                             <p className="break-words text-sm font-medium">
-                              {siswa?.nama_lengkap ?? item.nisn}
+                              {siswa?.nama_lengkap ?? item.id_siswa}
                             </p>
                             <p className="text-xs text-gray-500">
-                              {item.nisn}
+                              {item.id_siswa}
                             </p>
                           </div>
 
@@ -841,14 +883,14 @@ export default function KelolaKelasPage() {
 
                 <div className="mt-4 max-h-[430px] space-y-2 overflow-y-auto pr-1">
                   {filteredSiswaModal.map((item) => {
-                    const kelasAktif = getSiswaKelasAktif(item.nisn)
+                    const kelasAktif = getSiswaKelasAktif(item.id_siswa)
                     const kelasAktifData = firstItem(kelasAktif?.kelas)
                     const disabled = !!kelasAktif
-                    const checked = selectedSiswa.includes(item.nisn)
+                    const checked = selectedSiswa.includes(item.id_siswa)
 
                     return (
                       <label
-                        key={item.nisn}
+                        key={item.id_siswa}
                         className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm dark:border-gray-800 ${
                           disabled
                             ? "cursor-not-allowed bg-gray-100 opacity-70 dark:bg-gray-800"
@@ -861,7 +903,7 @@ export default function KelolaKelasPage() {
                           type="checkbox"
                           checked={checked}
                           disabled={disabled}
-                          onChange={() => togglePilihSiswa(item.nisn)}
+                          onChange={() => togglePilihSiswa(item.id_siswa)}
                           className="mt-1"
                         />
 
@@ -870,7 +912,7 @@ export default function KelolaKelasPage() {
                             {item.nama_lengkap ?? "-"}
                           </p>
                           <p className="text-xs text-gray-500">
-                            NISN: {item.nisn}
+                            ID Siswa: {item.id_siswa}
                           </p>
 
                           {disabled && (

@@ -105,11 +105,15 @@ export default function LoginPage() {
       return
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role, nisn, uid_guru")
-      .eq("id", data.user.id)
-      .single()
+    const { data: userData } = await supabase.auth.getUser()
+
+const userId = userData.user?.id
+
+const { data: profile, error: profileError } = await supabase
+  .from("profil")
+  .select("*")
+  .eq("user_id", userId)
+  .single()
 
     if (profileError || !profile) {
       setError("Profile user tidak ditemukan")
@@ -120,7 +124,7 @@ export default function LoginPage() {
     simpanTahunAjaran()
 
     if (profile.role === "admin") {
-      router.push("/admin/dashboard")
+      router.push("/dashboard")
       return
     }
 

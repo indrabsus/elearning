@@ -40,6 +40,17 @@ type MengajarMapel = {
   mapel: Mapel | Mapel[] | null
 }
 
+const getStoragePathFromUrl = (url: string | null | undefined) => {
+  if (!url) return null
+
+  const marker = "/storage/v1/object/public/elearning/"
+  const index = url.indexOf(marker)
+
+  if (index === -1) return null
+
+  return decodeURIComponent(url.substring(index + marker.length))
+}
+
 function firstItem<T>(value: T | T[] | null | undefined): T | null {
   if (!value) return null
   return Array.isArray(value) ? value[0] ?? null : value
@@ -197,33 +208,49 @@ export default function BankSoalPage() {
   }
 
   const handleDelete = async (id: string) => {
-    const yakin = confirm("Yakin ingin menghapus soal ini?")
-    if (!yakin) return
+  const yakin = confirm("Yakin ingin menghapus soal ini?")
+  if (!yakin) return
 
-    const { error: opsiError } = await supabase
-      .from("opsi_jawaban")
-      .delete()
-      .eq("id_soal", id)
+  const soal = soalList.find((item) => item.id_soal === id)
 
-    if (opsiError) {
-      alert(opsiError.message)
-      return
-    }
+  const filesToDelete = [
+    getStoragePathFromUrl(soal?.gambar_url),
+    getStoragePathFromUrl(soal?.audio_url),
+    ...(soal?.opsi_jawaban ?? []).map((opsi) =>
+      getStoragePathFromUrl(opsi.gambar_url)
+    ),
+  ].filter(Boolean) as string[]
 
-    const { error } = await supabase
-      .from("bank_soal")
-      .delete()
-      .eq("id_soal", id)
+  const { error: opsiError } = await supabase
+    .from("opsi_jawaban")
+    .delete()
+    .eq("id_soal", id)
 
-    if (error) {
-      alert(error.message)
-      return
-    }
-
-    if (uidGuru) {
-      await loadSoal(uidGuru, selectedMapel)
-    }
+  if (opsiError) {
+    alert(opsiError.message)
+    return
   }
+
+  const { error } = await supabase
+    .from("bank_soal")
+    .delete()
+    .eq("id_soal", id)
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  if (filesToDelete.length > 0) {
+    await supabase.storage
+      .from("elearning")
+      .remove(filesToDelete)
+  }
+
+  if (uidGuru) {
+    await loadSoal(uidGuru, selectedMapel)
+  }
+}
 
   const filteredSoal = soalList.filter((item) => {
     const keyword = search.toLowerCase()

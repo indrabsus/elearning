@@ -34,9 +34,9 @@ export default function AdminLayout({
       }
 
       const { data: profile } = await supabase
-        .from("profiles")
+        .from("profil")
         .select("role")
-        .eq("id", userData.user.id)
+        .eq("user_id", userData.user.id)
         .single()
 
       if (!profile || profile.role !== "admin") {
@@ -53,32 +53,32 @@ export default function AdminLayout({
   const menus = [
     {
       label: "Dashboard",
-      href: "/admin/dashboard",
+      href: "/dashboard",
       icon: <Home size={18} />,
     },
     {
       label: "Kelola Kelas",
-      href: "/admin/kelas",
+      href: "/kelas",
       icon: <Layers3 size={18} />,
     },
     {
       label: "Kelola Mapel",
-      href: "/admin/mapel",
+      href: "/mapel",
       icon: <BookOpen size={18} />,
     },
     {
       label: "Kelola Guru",
-      href: "/admin/guru",
+      href: "/guru",
       icon: <Users size={18} />,
     },
     {
       label: "Kelola Siswa",
-      href: "/admin/siswa",
+      href: "/siswa",
       icon: <GraduationCap size={18} />,
     },
     {
       label: "Pembagian Mengajar",
-      href: "/admin/pembagian-mengajar",
+      href: "/pembagian-mengajar",
       icon: <ClipboardList size={18} />,
     },
   ]

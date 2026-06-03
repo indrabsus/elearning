@@ -9,9 +9,9 @@ export async function requireRole(role: "admin" | "guru" | "siswa") {
   }
 
   const { data: profile } = await supabase
-    .from("profiles")
+    .from("profil")
     .select("role")
-    .eq("id", userData.user.id)
+    .eq("user_id", userData.user.id)
     .single()
 
   if (!profile || profile.role !== role) {

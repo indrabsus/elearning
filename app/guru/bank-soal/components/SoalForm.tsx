@@ -81,28 +81,114 @@ export default function SoalForm({
     setOpsi(defaultOpsi())
   }
 
-  const uploadFile = async (file: File, folder: "soal" | "audio") => {
-    const ext = file.name.split(".").pop()
-    const fileName = `${folder}/${Date.now()}-${Math.random()
-      .toString(36)
-      .substring(2)}.${ext}`
+  const compressImage = async (file: File): Promise<File> => {
+  if (!file.type.startsWith("image/")) {
+    return file
+  }
 
-    const { data, error } = await supabase.storage
-      .from("elearning")
-      .upload(fileName, file)
+  return new Promise((resolve) => {
+    const img = new Image()
+    const reader = new FileReader()
 
-    if (error) {
-      alert(error.message)
-      return
+    reader.onload = () => {
+      img.src = reader.result as string
     }
 
-    const { data: publicUrl } = supabase.storage
-      .from("elearning")
-      .getPublicUrl(data.path)
+    img.onload = () => {
+      const canvas = document.createElement("canvas")
 
-    if (folder === "soal") setGambarUrl(publicUrl.publicUrl)
-    if (folder === "audio") setAudioUrl(publicUrl.publicUrl)
+      const maxWidth = 1200
+      const scale = Math.min(1, maxWidth / img.width)
+
+      canvas.width = img.width * scale
+      canvas.height = img.height * scale
+
+      const ctx = canvas.getContext("2d")
+
+      if (!ctx) {
+        resolve(file)
+        return
+      }
+
+      ctx.drawImage(
+        img,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      )
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(file)
+            return
+          }
+
+          resolve(
+            new File(
+              [blob],
+              file.name.replace(/\.[^/.]+$/, ".webp"),
+              {
+                type: "image/webp",
+                lastModified: Date.now(),
+              }
+            )
+          )
+        },
+        "image/webp",
+        0.75
+      )
+    }
+
+    reader.readAsDataURL(file)
+  })
+}
+
+const uploadFile = async (
+  file: File,
+  folder: "soal" | "audio"
+) => {
+  let finalFile = file
+
+  if (folder === "soal") {
+    finalFile = await compressImage(file)
   }
+
+  const ext =
+    folder === "soal"
+      ? "webp"
+      : finalFile.name.split(".").pop()
+
+  const fileName = `${folder}/${Date.now()}-${Math.random()
+    .toString(36)
+    .substring(2)}.${ext}`
+
+  const { data, error } = await supabase.storage
+    .from("elearning")
+    .upload(fileName, finalFile, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: finalFile.type,
+    })
+
+  if (error) {
+    alert(error.message)
+    return
+  }
+
+  const { data: publicUrl } = supabase.storage
+    .from("elearning")
+    .getPublicUrl(data.path)
+
+  if (folder === "soal") {
+    setGambarUrl(publicUrl.publicUrl)
+  }
+
+  if (folder === "audio") {
+    setAudioUrl(publicUrl.publicUrl)
+  }
+}
 
   const simpanOpsi = async (idSoal: string) => {
     if (tipeSoal !== "pg") return true

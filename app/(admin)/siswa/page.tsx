@@ -11,7 +11,7 @@ import {
 import { supabase } from "@/lib/supabase";
 
 type Siswa = {
-  nisn: string
+  id_siswa: string
   nama_lengkap: string | null
   tempat_lahir: string | null
   tanggal_lahir: string | null
@@ -24,61 +24,88 @@ type Siswa = {
 
 const ITEMS_PER_PAGE = 10;
 
-const getSiswaData = async (): Promise<Siswa[]> => {
-  const idTahunAjaran =
-    localStorage.getItem("id_tahun_ajaran") || ""
+const fetchAll = async (
+  table: string,
+  selectQuery: string,
+  orderColumn?: string
+) => {
+  const pageSize = 1000
+  let from = 0
+  let to = pageSize - 1
+  let allData: any[] = []
+  let hasMore = true
 
-  const { data: siswaData, error: siswaError } = await supabase
-    .from("siswa")
-    .select("*")
-    .order("nama_lengkap", { ascending: true })
+  while (hasMore) {
+    let query = supabase
+      .from(table)
+      .select(selectQuery)
+      .range(from, to)
 
-  if (siswaError) {
-    console.error(siswaError.message)
-    return []
+    if (orderColumn) {
+      query = query.order(orderColumn, { ascending: true })
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error(error.message)
+      break
+    }
+
+    allData = [...allData, ...(data ?? [])]
+
+    if (!data || data.length < pageSize) {
+      hasMore = false
+    } else {
+      from += pageSize
+      to += pageSize
+    }
   }
+
+  return allData
+}
+
+const getSiswaData = async (): Promise<Siswa[]> => {
+  const idTahunAjaran = localStorage.getItem("id_tahun_ajaran") || ""
+
+  const siswaData = await fetchAll("siswa", "*", "nama_lengkap")
 
   if (!idTahunAjaran) {
     return siswaData ?? []
   }
 
-  const { data: siswaKelasData, error: siswaKelasError } = await supabase
-    .from("siswa_kelas")
-    .select(`
-      nisn,
+  const siswaKelasData = await fetchAll(
+    "siswa_kelas",
+    `
+      id_siswa,
       id_kelas,
-      status,
       kelas:id_kelas (
         tingkat,
         nama_kelas
       )
-    `)
-    .eq("id_tahun_ajaran", idTahunAjaran)
-    .eq("status", "aktif")
+    `
+  )
 
-  if (siswaKelasError) {
-    console.error(siswaKelasError.message)
-    return siswaData ?? []
-  }
+  const siswaKelasFiltered = siswaKelasData.filter(
+    (item) => item.id_tahun_ajaran === idTahunAjaran
+  )
 
   const kelasMap = new Map<string, string>()
 
-  ;(siswaKelasData ?? []).forEach((item: any) => {
-    const kelas = Array.isArray(item.kelas)
-      ? item.kelas[0]
-      : item.kelas
+  siswaKelasFiltered.forEach((item: any) => {
+    const kelas = Array.isArray(item.kelas) ? item.kelas[0] : item.kelas
 
     kelasMap.set(
-      item.nisn,
+      item.id_siswa,
       kelas
         ? `${kelas.tingkat ?? "-"} ${kelas.nama_kelas ?? "-"}`
         : "-"
     )
   })
 
-  return (siswaData ?? []).map((item) => ({
+  return siswaData.map((item) => ({
     ...item,
-    kelas_text: kelasMap.get(item.nisn) ?? "Belum dapat kelas",
+    kelas_text: kelasMap.get(item.id_siswa) ?? "Belum dapat kelas",
   }))
 }
 
@@ -213,9 +240,9 @@ export default function KelolaSiswaPage() {
   };
 
   const handleEdit = (item: Siswa) => {
-    setEditId(item.nisn);
+    setEditId(item.id_siswa);
 
-    setNisn(item.nisn);
+    setNisn(item.id_siswa ?? "");
     setNamaLengkap(item.nama_lengkap ?? "");
     setTempatLahir(item.tempat_lahir ?? "");
     setTanggalLahir(item.tanggal_lahir ?? "");
@@ -224,7 +251,7 @@ export default function KelolaSiswaPage() {
     setTahunMasuk(String(item.tahun_masuk ?? ""));
   };
 
-  const handleDelete = async (nisn: string) => {
+  const handleDelete = async (id_siswa: string) => {
     const confirmDelete = confirm(
       "Yakin ingin menghapus data siswa ini?"
     );
@@ -234,7 +261,7 @@ export default function KelolaSiswaPage() {
     const { error } = await supabase
       .from("siswa")
       .delete()
-      .eq("nisn", nisn);
+      .eq("id_siswa", id_siswa);
 
     if (error) {
       alert(error.message);
@@ -248,7 +275,7 @@ export default function KelolaSiswaPage() {
     const keyword = search.toLowerCase();
 
     return (
-  String(item.nisn ?? "").toLowerCase().includes(keyword) ||
+  String(item.id_siswa ?? "").toLowerCase().includes(keyword) ||
   String(item.nama_lengkap ?? "").toLowerCase().includes(keyword) ||
   String(item.kelas_text ?? "").toLowerCase().includes(keyword) ||
   String(item.tempat_lahir ?? "").toLowerCase().includes(keyword) ||
@@ -478,7 +505,7 @@ export default function KelolaSiswaPage() {
   ) : (
     paginatedSiswa.map((item, index) => (
       <div
-        key={item.nisn}
+        key={item.id_siswa}
         className="rounded-xl border p-4 shadow-sm dark:border-gray-800"
       >
         <p className="break-words font-semibold">
@@ -622,7 +649,7 @@ export default function KelolaSiswaPage() {
                 ) : (
                   paginatedSiswa.map((item, index) => (
                     <tr
-                      key={item.nisn}
+                      key={item.id_siswa}
                       className="border-b border-gray-100 dark:border-gray-800"
                     >
                       <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
