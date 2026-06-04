@@ -55,9 +55,9 @@ export default function SiswaNilaiPage() {
       }
 
       const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, nisn")
-        .eq("id", userData.user.id)
+        .from("profil")
+        .select("role, id_siswa")
+        .eq("user_id", userData.user.id)
         .single()
 
       if (!profile || profile.role !== "siswa") {
@@ -65,7 +65,7 @@ export default function SiswaNilaiPage() {
         return
       }
 
-      if (!profile.nisn) {
+      if (!profile.id_siswa) {
         router.push("/verifikasi-siswa")
         return
       }
@@ -81,14 +81,14 @@ export default function SiswaNilaiPage() {
             id_tugas,
             judul,
             tipe_tugas,
-            mapel_kelas_guru:id_mapel_kelas_guru (
+            mapel_kelas_guru:id_mkg (
               mapel:id_mapel (
                 nama_mapel
               )
             )
           )
         `)
-        .eq("nisn", profile.nisn)
+        .eq("id_siswa", profile.id_siswa)
         .not("nilai", "is", null)
         .order("selesai_at", { ascending: false })
 

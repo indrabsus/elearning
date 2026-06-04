@@ -43,7 +43,7 @@ type TugasRelasi = {
 type DetailJawaban = {
   id_tugas_siswa: string
   id_tugas: string
-  nisn: string
+  id_siswa: string
   status: string | null
   nilai: number | null
   selesai_at: string | null
@@ -107,9 +107,9 @@ export default function DetailNilaiGuruPage() {
       }
 
       const { data: profile } = await supabase
-        .from("profiles")
+        .from("profil")
         .select("role, uid_guru")
-        .eq("id", userData.user.id)
+        .eq("user_id", userData.user.id)
         .single()
 
       if (!profile || profile.role !== "guru") {
@@ -127,21 +127,21 @@ export default function DetailNilaiGuruPage() {
         .select(`
           id_tugas_siswa,
           id_tugas,
-          nisn,
+          id_siswa,
           status,
           nilai,
           selesai_at,
           jawaban,
           file_url,
           catatan_guru,
-          siswa:nisn (
+          siswa:id_siswa (
             nama_lengkap
           ),
           tugas:id_tugas (
             judul,
             deskripsi,
             tipe_tugas,
-            mapel_kelas_guru:id_mapel_kelas_guru (
+            mapel_kelas_guru:id_mkg (
               uid_guru,
               mapel:id_mapel (
                 nama_mapel
@@ -302,7 +302,7 @@ export default function DetailNilaiGuruPage() {
 
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
           <Info label="Siswa" value={siswa?.nama_lengkap ?? "-"} />
-          <Info label="NISN" value={detail?.nisn ?? "-"} />
+          <Info label="Id Siswa" value={detail?.id_siswa ?? "-"} />
           <Info
             label="Dikumpulkan"
             value={formatTanggal(detail?.selesai_at ?? null)}

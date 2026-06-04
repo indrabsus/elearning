@@ -34,7 +34,7 @@ type MapelKelasGuru = {
 
 type Tugas = {
   id_tugas: string
-  id_mapel_kelas_guru: string
+  id_mkg: string
   judul: string
   deskripsi: string | null
   deadline: string | null
@@ -96,9 +96,9 @@ export default function SiswaTugasPage() {
       }
 
       const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, nisn")
-        .eq("id", userData.user.id)
+        .from("profil")
+        .select("role, id_siswa, user_id")
+        .eq("user_id", userData.user.id)
         .single()
 
       if (!profile || profile.role !== "siswa") {
@@ -106,7 +106,7 @@ export default function SiswaTugasPage() {
         return
       }
 
-      if (!profile.nisn) {
+      if (!profile.id_siswa) {
         router.push("/verifikasi-siswa")
         return
       }
@@ -121,9 +121,8 @@ export default function SiswaTugasPage() {
               nama_kelas
             )
           `)
-          .eq("nisn", profile.nisn)
+          .eq("id_siswa", profile.id_siswa)
           .eq("id_tahun_ajaran", idTahunAjaran)
-          .eq("status", "aktif")
           .maybeSingle()
 
       if (siswaKelasError) {
@@ -152,7 +151,7 @@ export default function SiswaTugasPage() {
       const { data: mengajarData, error: mengajarError } =
         await supabase
           .from("mapel_kelas_guru")
-          .select("id_mapel_kelas_guru")
+          .select("id_mkg")
           .eq("id_kelas", siswaKelas.id_kelas)
           .eq("id_tahun_ajaran", idTahunAjaran)
 
@@ -163,7 +162,7 @@ export default function SiswaTugasPage() {
       }
 
       const idsMengajar =
-        mengajarData?.map((item) => item.id_mapel_kelas_guru) ?? []
+        mengajarData?.map((item) => item.id_mkg) ?? []
 
       if (idsMengajar.length === 0) {
         setTugasList([])
@@ -175,14 +174,14 @@ export default function SiswaTugasPage() {
         .from("tugas")
         .select(`
           id_tugas,
-          id_mapel_kelas_guru,
+          id_mkg,
           judul,
           deskripsi,
           deadline,
           status,
           created_at,
           tipe_tugas,
-          mapel_kelas_guru:id_mapel_kelas_guru (
+          mapel_kelas_guru:id_mkg (
             mapel:id_mapel (
               nama_mapel
             ),
@@ -192,7 +191,7 @@ export default function SiswaTugasPage() {
             )
           )
         `)
-        .in("id_mapel_kelas_guru", idsMengajar)
+        .in("id_mkg", idsMengajar)
         .eq("status", "aktif")
         .order("created_at", { ascending: false })
 
@@ -214,7 +213,7 @@ export default function SiswaTugasPage() {
             .select(`
               id_tugas_siswa,
               id_tugas,
-              nisn,
+              id_siswa,
               status,
               mulai_at,
               selesai_at,
@@ -222,7 +221,7 @@ export default function SiswaTugasPage() {
               jawaban,
               file_url
             `)
-            .eq("nisn", profile.nisn)
+            .eq("id_siswa", profile.id_siswa)
             .in("id_tugas", idsTugas)
 
         if (tugasSiswaError) {

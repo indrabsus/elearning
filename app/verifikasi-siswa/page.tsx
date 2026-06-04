@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 
@@ -15,96 +15,58 @@ import {
 } from "@/components/ui/card"
 
 type Siswa = {
-  nisn: string
-  nama_lengkap: string
-  tempat_lahir: string
-  tanggal_lahir: string
-  jenkel: string
-  agama: string
-  tahun_masuk: number
-}
-
-type Kelas = {
-  id_kelas: string
-  tingkat: number | null
-  nama_kelas: string | null
-}
-
-type SiswaKelas = {
-  id_siswa_kelas: string
-  id_kelas: string
-  status: string | null
-  kelas: Kelas | Kelas[] | null
-}
-
-function firstItem<T>(value: T | T[] | null | undefined): T | null {
-  if (!value) return null
-  return Array.isArray(value) ? value[0] ?? null : value
+  id_siswa: string
+  no_skulio: number | null
+  nama_lengkap: string | null
+  tempat_lahir: string | null
+  tanggal_lahir: string | null
+  jenkel: string | null
+  agama: string | null
 }
 
 export default function VerifikasiSiswaPage() {
   const router = useRouter()
 
-  const [nisn, setNisn] = useState("")
+  const [noSkulio, setNoSkulio] = useState("")
   const [tanggalLahir, setTanggalLahir] = useState("")
   const [siswa, setSiswa] = useState<Siswa | null>(null)
-  const [siswaKelas, setSiswaKelas] = useState<SiswaKelas | null>(null)
-
-  const [kelasList, setKelasList] = useState<Kelas[]>([])
-  const [selectedKelas, setSelectedKelas] = useState("")
 
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
-  useEffect(() => {
-    const getKelas = async () => {
-      const { data, error } = await supabase
-        .from("kelas")
-        .select("id_kelas, tingkat, nama_kelas")
-        .order("tingkat", { ascending: true })
-        .order("nama_kelas", { ascending: true })
-
-      if (error) {
-        setError(error.message)
-        return
-      }
-
-      setKelasList((data ?? []) as Kelas[])
-    }
-
-    getKelas()
-  }, [])
-
-  const cekSiswa = async (e: React.BaseSyntheticEvent) => {
+  const handleCariSiswa = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     setError("")
     setSiswa(null)
-    setSiswaKelas(null)
-    setSelectedKelas("")
-    setLoading(true)
 
-    const nisnTrim = nisn.trim()
+    const noSkulioTrim = noSkulio.trim()
 
-    if (!nisnTrim || !tanggalLahir) {
-      setError("NISN dan tanggal lahir wajib diisi")
-      setLoading(false)
+    if (!noSkulioTrim) {
+      setError("No Skulio wajib diisi")
       return
     }
+
+    if (!/^\d{8}$/.test(noSkulioTrim)) {
+      setError("No Skulio harus 8 digit angka")
+      return
+    }
+
+    setLoading(true)
 
     const { data, error } = await supabase
       .from("siswa")
       .select(`
-        nisn,
+        id_siswa,
+        no_skulio,
         nama_lengkap,
         tempat_lahir,
         tanggal_lahir,
         jenkel,
-        agama,
-        tahun_masuk
+        agama
       `)
-      .eq("nisn", nisnTrim)
-      .eq("tanggal_lahir", tanggalLahir)
+      .eq("no_skulio", Number(noSkulioTrim))
       .maybeSingle()
 
     if (error) {
@@ -114,202 +76,135 @@ export default function VerifikasiSiswaPage() {
     }
 
     if (!data) {
-      setError("Data siswa tidak ditemukan atau tanggal lahir tidak sesuai")
+      setError("Data siswa tidak ditemukan. Periksa kembali No Skulio dan tanggal lahir.")
       setLoading(false)
       return
     }
 
-    const siswaFinal = data as Siswa
-    setSiswa(siswaFinal)
+    const { data: profilSudahAda, error: cekProfilError } = await supabase
+      .from("profil")
+      .select("id_profil, nama")
+      .eq("id_siswa", data.id_siswa)
+      .maybeSingle()
 
-    const idTahunAjaran =
-      localStorage.getItem("id_tahun_ajaran") || ""
-
-    if (!idTahunAjaran) {
-      setError("Tahun ajaran belum dipilih. Silakan login ulang.")
+    if (cekProfilError) {
+      setError(cekProfilError.message)
       setLoading(false)
       return
     }
 
-    const { data: siswaKelasData, error: siswaKelasError } =
-      await supabase
-        .from("siswa_kelas")
-        .select(`
-          id_siswa_kelas,
-          id_kelas,
-          status,
-          kelas:id_kelas (
-            id_kelas,
-            tingkat,
-            nama_kelas
-          )
-        `)
-        .eq("nisn", siswaFinal.nisn)
-        .eq("id_tahun_ajaran", idTahunAjaran)
-        .maybeSingle()
-
-    if (siswaKelasError) {
-      setError(siswaKelasError.message)
+    if (profilSudahAda) {
+      setError("Data siswa ini sudah terhubung dengan akun lain.")
       setLoading(false)
       return
     }
 
-    if (siswaKelasData) {
-      const siswaKelasFinal =
-        siswaKelasData as unknown as SiswaKelas
-
-      setSiswaKelas(siswaKelasFinal)
-      setSelectedKelas(siswaKelasFinal.id_kelas)
-    }
-
+    setSiswa(data as Siswa)
     setLoading(false)
   }
 
-  const simpanNisnKeProfile = async () => {
-    if (!siswa) return
+ const handleHubungkanAkun = async () => {
+  if (!siswa) return
 
-    setError("")
-    setLoading(true)
+  setError("")
+  setSaving(true)
 
-    const idTahunAjaran =
-      localStorage.getItem("id_tahun_ajaran") || ""
+  const { data: userData, error: userError } = await supabase.auth.getUser()
 
-    if (!idTahunAjaran) {
-      setError("Tahun ajaran belum dipilih. Silakan login ulang.")
-      setLoading(false)
-      router.push("/")
-      return
-    }
-
-    const finalIdKelas = siswaKelas?.id_kelas || selectedKelas
-
-    if (!finalIdKelas) {
-      setError("Silakan pilih kelas untuk tahun ajaran ini")
-      setLoading(false)
-      return
-    }
-
-    const { data: userData, error: userError } =
-      await supabase.auth.getUser()
-
-    if (userError || !userData.user) {
-      setError("Session tidak ditemukan. Silakan login ulang.")
-      setLoading(false)
-      router.push("/")
-      return
-    }
-
-    const { data: existingProfile, error: existingProfileError } =
-      await supabase
-        .from("profiles")
-        .select("id")
-        .eq("nisn", siswa.nisn)
-        .neq("id", userData.user.id)
-        .maybeSingle()
-
-    if (existingProfileError) {
-      setError(existingProfileError.message)
-      setLoading(false)
-      return
-    }
-
-    if (existingProfile) {
-      setError("NISN sudah digunakan akun lain")
-      setLoading(false)
-      return
-    }
-
-    const { data: existingSiswaKelas, error: existingSiswaKelasError } =
-      await supabase
-        .from("siswa_kelas")
-        .select("id_siswa_kelas")
-        .eq("nisn", siswa.nisn)
-        .eq("id_tahun_ajaran", idTahunAjaran)
-        .maybeSingle()
-
-    if (existingSiswaKelasError) {
-      setError(existingSiswaKelasError.message)
-      setLoading(false)
-      return
-    }
-
-    if (existingSiswaKelas) {
-      const { error: updateError } = await supabase
-        .from("siswa_kelas")
-        .update({
-          id_kelas: finalIdKelas,
-          status: "aktif",
-        })
-        .eq("id_siswa_kelas", existingSiswaKelas.id_siswa_kelas)
-
-      if (updateError) {
-        setError(updateError.message)
-        setLoading(false)
-        return
-      }
-    } else {
-      const { error: insertError } = await supabase
-        .from("siswa_kelas")
-        .insert({
-          nisn: siswa.nisn,
-          id_kelas: finalIdKelas,
-          id_tahun_ajaran: idTahunAjaran,
-          status: "aktif",
-        })
-
-      if (insertError) {
-        setError(insertError.message)
-        setLoading(false)
-        return
-      }
-    }
-
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .update({
-        nisn: siswa.nisn,
-      })
-      .eq("id", userData.user.id)
-
-    if (profileError) {
-      setError(profileError.message)
-      setLoading(false)
-      return
-    }
-
-    router.push("/siswa/dashboard")
+  if (userError || !userData.user) {
+    setError("User belum login. Silakan login ulang.")
+    setSaving(false)
+    router.replace("/login")
+    return
   }
 
-  const kelasSiswa = firstItem(siswaKelas?.kelas)
+  const userId = userData.user.id
+
+  const { data: profilLogin, error: profilLoginError } = await supabase
+    .from("profil")
+    .select("id_profil, role, id_siswa")
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (profilLoginError) {
+    setError(profilLoginError.message)
+    setSaving(false)
+    return
+  }
+
+  if (!profilLogin) {
+    setError("Profil akun tidak ditemukan. Silakan hubungi admin.")
+    setSaving(false)
+    return
+  }
+
+  if (profilLogin.id_siswa) {
+    setError("Akun ini sudah terhubung dengan data siswa.")
+    setSaving(false)
+    return
+  }
+
+  const { data: siswaSudahDipakai, error: cekSiswaError } = await supabase
+    .from("profil")
+    .select("user_id")
+    .eq("id_siswa", siswa.id_siswa)
+    .maybeSingle()
+
+  if (cekSiswaError) {
+    setError(cekSiswaError.message)
+    setSaving(false)
+    return
+  }
+
+  if (siswaSudahDipakai) {
+    setError("Data siswa ini sudah terhubung dengan akun lain.")
+    setSaving(false)
+    return
+  }
+
+  const { error: updateProfilError } = await supabase
+    .from("profil")
+    .update({
+      id_siswa: siswa.id_siswa,
+      nama: siswa.nama_lengkap,
+    })
+    .eq("user_id", userId)
+
+  if (updateProfilError) {
+    setError(updateProfilError.message)
+    setSaving(false)
+    return
+  }
+
+  setSaving(false)
+  router.replace("/siswa/dashboard")
+}
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4 dark:bg-slate-950">
-      <Card className="w-full max-w-lg shadow-xl">
+      <Card className="w-full max-w-md shadow-xl">
         <CardHeader>
           <CardTitle className="text-center text-2xl">
-            Verifikasi Data Siswa
+            Verifikasi Siswa
           </CardTitle>
         </CardHeader>
 
-        <CardContent>
-          <form onSubmit={cekSiswa} className="space-y-4">
+        <CardContent className="space-y-5">
+          <form onSubmit={handleCariSiswa} className="space-y-4">
             <div className="space-y-2">
-              <Label>NISN</Label>
+              <Label>No Skulio</Label>
               <Input
-                value={nisn}
-                onChange={(e) => setNisn(e.target.value)}
-                placeholder="Masukkan NISN"
+                type="text"
+                inputMode="numeric"
+                maxLength={8}
+                placeholder="Masukkan 8 digit No Skulio"
+                value={noSkulio}
+                onChange={(e) =>
+                  setNoSkulio(e.target.value.replace(/\D/g, ""))
+                }
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Tanggal Lahir</Label>
-              <Input
-                type="date"
-                value={tanggalLahir}
-                onChange={(e) => setTanggalLahir(e.target.value)}
-              />
-            </div>
 
             {error && (
               <p className="text-sm text-red-500">
@@ -317,93 +212,52 @@ export default function VerifikasiSiswaPage() {
               </p>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Mengecek..." : "Cek Data"}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading}
+            >
+              {loading ? "Mencari..." : "Cari Data Siswa"}
             </Button>
           </form>
 
           {siswa && (
-            <div className="mt-6 rounded-xl border bg-white p-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h3 className="mb-3 text-lg font-semibold">
+            <div className="rounded-xl border bg-slate-50 p-4 text-sm dark:bg-slate-900">
+              <h3 className="mb-3 font-semibold">
                 Data Ditemukan
               </h3>
 
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <p>
-                  <b>NISN:</b> {siswa.nisn}
+                  <span className="font-medium">No Skulio:</span>{" "}
+                  {siswa.no_skulio}
                 </p>
-
                 <p>
-                  <b>Nama:</b> {siswa.nama_lengkap}
+                  <span className="font-medium">Nama:</span>{" "}
+                  {siswa.nama_lengkap}
                 </p>
-
                 <p>
-                  <b>Tempat Tanggal Lahir:</b>{" "}
-                  {siswa.tempat_lahir},{" "}
-                  {new Date(siswa.tanggal_lahir).toLocaleDateString(
-                    "id-ID",
-                    {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    }
-                  )}
+                  <span className="font-medium">Tempat/Tanggal Lahir:</span>{" "}
+                  {siswa.tempat_lahir ?? "-"},{" "}
+                  {siswa.tanggal_lahir ?? "-"}
                 </p>
-
                 <p>
-                  <b>Jenis Kelamin:</b>{" "}
-                  {siswa.jenkel === "P" ? "Perempuan" : "Laki-laki"}
+                  <span className="font-medium">Jenis Kelamin:</span>{" "}
+                  {siswa.jenkel ?? "-"}
                 </p>
-
                 <p>
-                  <b>Agama:</b> {siswa.agama}
+                  <span className="font-medium">Agama:</span>{" "}
+                  {siswa.agama ?? "-"}
                 </p>
-
-                <p>
-                  <b>Tahun Masuk:</b> {siswa.tahun_masuk}
-                </p>
-
-                {siswaKelas ? (
-                  <p>
-                    <b>Kelas Tahun Ajaran Ini:</b>{" "}
-                    {kelasSiswa
-                      ? `${kelasSiswa.tingkat ?? "-"} ${
-                          kelasSiswa.nama_kelas ?? "-"
-                        }`
-                      : "-"}
-                  </p>
-                ) : (
-                  <div className="space-y-2 pt-2">
-                    <Label>Pilih Kelas Tahun Ajaran Ini</Label>
-
-                    <select
-                      value={selectedKelas}
-                      onChange={(e) => setSelectedKelas(e.target.value)}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="">Pilih kelas</option>
-
-                      {kelasList.map((kelas) => (
-                        <option key={kelas.id_kelas} value={kelas.id_kelas}>
-                          {kelas.tingkat} - {kelas.nama_kelas}
-                        </option>
-                      ))}
-                    </select>
-
-                    <p className="text-xs text-slate-500">
-                      Siswa belum terdaftar di kelas untuk tahun ajaran yang dipilih.
-                    </p>
-                  </div>
-                )}
               </div>
 
               <Button
                 type="button"
-                onClick={simpanNisnKeProfile}
                 className="mt-4 w-full"
-                disabled={loading}
+                disabled={saving}
+                onClick={handleHubungkanAkun}
               >
-                {loading ? "Menyimpan..." : "Gunakan Data Ini"}
+                {saving ? "Menghubungkan..." : "Hubungkan ke Akun Saya"}
               </Button>
             </div>
           )}

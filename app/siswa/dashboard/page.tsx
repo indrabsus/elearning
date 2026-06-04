@@ -11,7 +11,7 @@ import {
 import { supabase } from "@/lib/supabase"
 
 type Siswa = {
-  nisn: string
+  id_siswa: string
   nama_lengkap: string
   tempat_lahir: string
   tanggal_lahir: string
@@ -28,7 +28,6 @@ type Kelas = {
 type KelasAktif = {
   id_siswa_kelas: string
   id_kelas: string
-  status: string | null
   kelas: Kelas | Kelas[] | null
 }
 
@@ -108,9 +107,9 @@ export default function SiswaDashboardPage() {
       }
 
       const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, nisn")
-        .eq("id", userData.user.id)
+        .from("profil")
+        .select("role, id_siswa")
+        .eq("user_id", userData.user.id)
         .single()
 
       if (!profile || profile.role !== "siswa") {
@@ -118,7 +117,7 @@ export default function SiswaDashboardPage() {
         return
       }
 
-      if (!profile.nisn) {
+      if (!profile.id_siswa) {
         router.push("/verifikasi-siswa")
         return
       }
@@ -126,7 +125,7 @@ export default function SiswaDashboardPage() {
       const { data: siswaData, error: siswaError } = await supabase
         .from("siswa")
         .select(`
-          nisn,
+          id_siswa,
           nama_lengkap,
           tempat_lahir,
           tanggal_lahir,
@@ -134,7 +133,7 @@ export default function SiswaDashboardPage() {
           agama,
           tahun_masuk
         `)
-        .eq("nisn", profile.nisn)
+        .eq("id_siswa", profile.id_siswa)
         .single()
 
       if (siswaError || !siswaData) {
@@ -149,14 +148,13 @@ export default function SiswaDashboardPage() {
           .from("siswa_kelas")
           .select(`
             id_siswa_kelas,
-            status,
             id_kelas,
             kelas:id_kelas (
               tingkat,
               nama_kelas
             )
           `)
-          .eq("nisn", profile.nisn)
+          .eq("id_siswa", profile.id_siswa)
           .eq("id_tahun_ajaran", idTahunAjaran)
           .maybeSingle()
 
@@ -181,7 +179,7 @@ export default function SiswaDashboardPage() {
       const { data: mengajarData, error: mengajarError } =
         await supabase
           .from("mapel_kelas_guru")
-          .select("id_mapel_kelas_guru")
+          .select("id_mkg")
           .eq("id_kelas", idKelas)
           .eq("id_tahun_ajaran", idTahunAjaran)
 
@@ -192,24 +190,24 @@ export default function SiswaDashboardPage() {
       }
 
       const idMengajar =
-        mengajarData?.map((item) => item.id_mapel_kelas_guru) ?? []
+        mengajarData?.map((item) => item.id_mkg) ?? []
 
       if (idMengajar.length > 0) {
         const { count: materiCount } = await supabase
           .from("materi")
           .select("*", { count: "exact", head: true })
-          .in("id_mapel_kelas_guru", idMengajar)
+          .in("id_mkg", idMengajar)
 
         const { count: tugasCount } = await supabase
           .from("tugas")
           .select("*", { count: "exact", head: true })
-          .in("id_mapel_kelas_guru", idMengajar)
+          .in("id_mkg", idMengajar)
           .eq("status", "aktif")
 
         const { data: tugasAktif } = await supabase
           .from("tugas")
           .select("id_tugas")
-          .in("id_mapel_kelas_guru", idMengajar)
+          .in("id_mkg", idMengajar)
           .eq("status", "aktif")
 
         const idsTugasAktif =
@@ -221,7 +219,7 @@ export default function SiswaDashboardPage() {
           const { count } = await supabase
             .from("tugas_siswa")
             .select("*", { count: "exact", head: true })
-            .eq("nisn", profile.nisn)
+            .eq("id_siswa", profile.id_siswa)
             .in("id_tugas", idsTugasAktif)
             .in("status", ["selesai", "dinilai"])
 
@@ -239,13 +237,13 @@ export default function SiswaDashboardPage() {
           .select(`
             nama_materi,
             created_at,
-            mapel_kelas_guru:id_mapel_kelas_guru (
+            mapel_kelas_guru:id_mkg (
               mapel:id_mapel (
                 nama_mapel
               )
             )
           `)
-          .in("id_mapel_kelas_guru", idMengajar)
+          .in("id_mkg", idMengajar)
           .order("created_at", { ascending: false })
           .limit(5)
 
@@ -270,13 +268,13 @@ export default function SiswaDashboardPage() {
             id_tugas,
             judul,
             created_at,
-            mapel_kelas_guru:id_mapel_kelas_guru (
+            mapel_kelas_guru:id_mkg (
               mapel:id_mapel (
                 nama_mapel
               )
             )
           `)
-          .in("id_mapel_kelas_guru", idMengajar)
+          .in("id_mkg", idMengajar)
           .eq("status", "aktif")
           .order("created_at", { ascending: false })
           .limit(5)
@@ -293,7 +291,7 @@ export default function SiswaDashboardPage() {
           const { data } = await supabase
             .from("tugas_siswa")
             .select("id_tugas, status, selesai_at, nilai")
-            .eq("nisn", profile.nisn)
+            .eq("id_siswa", profile.id_siswa)
             .in("id_tugas", idsTugas)
 
           tugasSiswaData = (data ?? []) as TugasSiswaData[]
@@ -397,10 +395,9 @@ export default function SiswaDashboardPage() {
           </h3>
 
           <div className="mt-4 space-y-2 text-sm">
-            <Info label="NISN" value={siswa?.nisn} />
+            <Info label="ID Siswa" value={siswa?.id_siswa} />
             <Info label="Nama Lengkap" value={siswa?.nama_lengkap} />
             <Info label="Kelas" value={kelasText} />
-            <Info label="Status Kelas" value={kelasAktif?.status} />
             <Info label="Tempat Lahir" value={siswa?.tempat_lahir} />
             <Info
               label="Tanggal Lahir"

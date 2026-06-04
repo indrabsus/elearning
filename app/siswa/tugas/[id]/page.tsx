@@ -21,7 +21,7 @@ type MapelKelasGuru = {
 
 type Tugas = {
   id_tugas: string
-  id_mapel_kelas_guru: string
+  id_mkg: string
   judul: string
   deskripsi: string | null
   deadline: string | null
@@ -33,7 +33,7 @@ type Tugas = {
 type TugasSiswa = {
   id_tugas_siswa: string
   id_tugas: string
-  nisn: string
+  id_siswa: string
   status: string | null
   mulai_at: string | null
   selesai_at: string | null
@@ -106,9 +106,9 @@ export default function KerjakanTugasPage() {
     }
 
     const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, nisn")
-      .eq("id", userData.user.id)
+      .from("profil")
+      .select("role, id_siswa, user_id")
+      .eq("user_id", userData.user.id)
       .single()
 
     if (!profile || profile.role !== "siswa") {
@@ -116,7 +116,7 @@ export default function KerjakanTugasPage() {
       return
     }
 
-    if (!profile.nisn) {
+    if (!profile.id_siswa) {
       router.push("/verifikasi-siswa")
       return
     }
@@ -125,13 +125,13 @@ export default function KerjakanTugasPage() {
       .from("tugas")
       .select(`
         id_tugas,
-        id_mapel_kelas_guru,
+        id_mkg,
         judul,
         deskripsi,
         deadline,
         status,
         tipe_tugas,
-        mapel_kelas_guru:id_mapel_kelas_guru (
+        mapel_kelas_guru:id_mkg (
           mapel:id_mapel (
             nama_mapel
           ),
@@ -158,7 +158,7 @@ export default function KerjakanTugasPage() {
       .select(`
         id_tugas_siswa,
         id_tugas,
-        nisn,
+        id_siswa,
         status,
         mulai_at,
         selesai_at,
@@ -167,7 +167,7 @@ export default function KerjakanTugasPage() {
         file_url
       `)
       .eq("id_tugas", idTugas)
-      .eq("nisn", profile.nisn)
+      .eq("id_siswa", profile.id_siswa)
       .maybeSingle()
 
     let dataTugasSiswa: TugasSiswa | null = null
@@ -183,18 +183,18 @@ export default function KerjakanTugasPage() {
         .upsert(
           {
             id_tugas: idTugas,
-            nisn: profile.nisn,
+            id_siswa: profile.id_siswa,
             status: "dikerjakan",
             mulai_at: new Date().toISOString(),
           },
           {
-            onConflict: "id_tugas,nisn",
+            onConflict: "id_tugas,id_siswa",
           }
         )
         .select(`
           id_tugas_siswa,
           id_tugas,
-          nisn,
+          id_siswa,
           status,
           mulai_at,
           selesai_at,

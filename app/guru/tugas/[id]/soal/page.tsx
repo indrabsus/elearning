@@ -32,7 +32,7 @@ type Tugas = {
   id_tugas: string
   judul: string
   tipe_tugas: string | null
-  id_mapel_kelas_guru: string
+  id_mkg: string
   mapel_kelas_guru: MapelKelasGuru | MapelKelasGuru[] | null
 }
 
@@ -94,9 +94,9 @@ export default function KelolaSoalTugasPage() {
     }
 
     const { data: profile } = await supabase
-      .from("profiles")
+      .from("profil")
       .select("role, uid_guru")
-      .eq("id", userData.user.id)
+      .eq("user_id", userData.user.id)
       .single()
 
     if (!profile || profile.role !== "guru" || !profile.uid_guru) {
@@ -112,8 +112,8 @@ export default function KelolaSoalTugasPage() {
         id_tugas,
         judul,
         tipe_tugas,
-        id_mapel_kelas_guru,
-        mapel_kelas_guru:id_mapel_kelas_guru (
+        id_mkg,
+        mapel_kelas_guru:id_mkg (
           id_mapel,
           id_kelas,
           uid_guru,

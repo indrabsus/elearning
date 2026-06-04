@@ -32,7 +32,7 @@ type Materi = {
   deskripsi: string | null
   url: string | null
   created_at: string
-  id_mapel_kelas_guru: string | null
+  id_mkg: string | null
   mapel_kelas_guru: MapelKelasGuru | MapelKelasGuru[] | null
 }
 
@@ -72,9 +72,9 @@ export default function SiswaMateriPage() {
       }
 
       const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, nisn")
-        .eq("id", userData.user.id)
+        .from("profil")
+        .select("role, id_siswa, user_id")
+        .eq("user_id", userData.user.id)
         .single()
 
       if (!profile || profile.role !== "siswa") {
@@ -82,7 +82,7 @@ export default function SiswaMateriPage() {
         return
       }
 
-      if (!profile.nisn) {
+      if (!profile.id_siswa) {
         router.push("/verifikasi-siswa")
         return
       }
@@ -97,9 +97,8 @@ export default function SiswaMateriPage() {
               nama_kelas
             )
           `)
-          .eq("nisn", profile.nisn)
+          .eq("id_siswa", profile.id_siswa)
           .eq("id_tahun_ajaran", idTahunAjaran)
-          .eq("status", "aktif")
           .maybeSingle()
 
       if (siswaKelasError) {
@@ -128,7 +127,7 @@ export default function SiswaMateriPage() {
       const { data: mengajarData, error: mengajarError } =
         await supabase
           .from("mapel_kelas_guru")
-          .select("id_mapel_kelas_guru")
+          .select("id_mkg")
           .eq("id_kelas", siswaKelas.id_kelas)
           .eq("id_tahun_ajaran", idTahunAjaran)
 
@@ -139,7 +138,7 @@ export default function SiswaMateriPage() {
       }
 
       const idsMengajar =
-        mengajarData?.map((item) => item.id_mapel_kelas_guru) ?? []
+        mengajarData?.map((item) => item.id_mkg) ?? []
 
       if (idsMengajar.length === 0) {
         setMateriList([])
@@ -155,8 +154,8 @@ export default function SiswaMateriPage() {
           deskripsi,
           url,
           created_at,
-          id_mapel_kelas_guru,
-          mapel_kelas_guru:id_mapel_kelas_guru (
+          id_mkg,
+          mapel_kelas_guru:id_mkg (
             id_kelas,
             id_mapel,
             mapel:id_mapel (
@@ -168,7 +167,7 @@ export default function SiswaMateriPage() {
             )
           )
         `)
-        .in("id_mapel_kelas_guru", idsMengajar)
+        .in("id_mkg", idsMengajar)
         .order("created_at", { ascending: false })
 
       if (materiError) {
