@@ -21,7 +21,7 @@ type Kelas = {
 };
 
 type PembagianMengajar = {
-  id_mapel_kelas_guru: string;
+  id_mkg: string;
   uid_guru: string;
   id_mapel: string;
   id_kelas: string;
@@ -90,7 +90,7 @@ export default function PembagianMengajarPage() {
       supabase
         .from("mapel_kelas_guru")
         .select(`
-          id_mapel_kelas_guru,
+          id_mkg,
           uid_guru,
           id_mapel,
           id_kelas,
@@ -170,7 +170,7 @@ export default function PembagianMengajarPage() {
 
     const { data: existing } = await supabase
       .from("mapel_kelas_guru")
-      .select("id_mapel_kelas_guru")
+      .select("id_mkg")
       .eq("uid_guru", uidGuru)
       .eq("id_mapel", idMapel)
       .eq("id_kelas", idKelas)
@@ -211,7 +211,7 @@ export default function PembagianMengajarPage() {
     const { error } = await supabase
       .from("mapel_kelas_guru")
       .delete()
-      .eq("id_mapel_kelas_guru", id);
+      .eq("id_mkg", id);
 
     if (error) {
       alert(error.message);
@@ -446,7 +446,7 @@ const kelas = item.kelas;
 
                     return (
                       <tr
-                        key={item.id_mapel_kelas_guru}
+                        key={item.id_mkg}
                         className="border-b border-gray-100 dark:border-gray-800"
                       >
                         <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
@@ -471,7 +471,7 @@ const kelas = item.kelas;
                           <button
                             type="button"
                             onClick={() =>
-                              handleDelete(item.id_mapel_kelas_guru)
+                              handleDelete(item.id_mkg)
                             }
                             className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300"
                           >

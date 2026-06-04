@@ -129,15 +129,15 @@ const { data: profile, error: profileError } = await supabase
     }
 
     if (profile.role === "siswa") {
-  if (!profile.nisn) {
+  if (!profile.id_siswa) {
     router.push("/verifikasi-siswa")
     return
   }
 
   const { data: siswaKelas, error: siswaKelasError } = await supabase
     .from("siswa_kelas")
-    .select("id_siswa_kelas, id_kelas, status")
-    .eq("nisn", profile.nisn)
+    .select("id_siswa_kelas, id_kelas")
+    .eq("id_siswa", profile.id_siswa)
     .eq("id_tahun_ajaran", selectedTahunAjaran)
     .maybeSingle()
 
@@ -165,7 +165,7 @@ const { data: profile, error: profileError } = await supabase
       const { data: pembagianMengajar, error: pembagianError } =
         await supabase
           .from("mapel_kelas_guru")
-          .select("id_mapel_kelas_guru")
+          .select("id_mkg")
           .eq("uid_guru", profile.uid_guru)
           .eq("id_tahun_ajaran", selectedTahunAjaran)
           .limit(1)

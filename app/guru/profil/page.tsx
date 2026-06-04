@@ -39,9 +39,9 @@ export default function ProfilGuruPage() {
       setEmail(userData.user.email || "")
 
       const { data: profile } = await supabase
-        .from("profiles")
+        .from("profil")
         .select("role, uid_guru")
-        .eq("id", userData.user.id)
+        .eq("user_id", userData.user.id)
         .single()
 
       if (!profile || profile.role !== "guru") {

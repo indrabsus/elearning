@@ -22,7 +22,7 @@ type Kelas = {
 }
 
 type PembagianMengajar = {
-  id_mapel_kelas_guru: string
+  id_mkg: string
   uid_guru: string
   id_mapel: string
   id_kelas: string
@@ -77,9 +77,9 @@ export default function GuruPembagianMengajarPage() {
     }
 
     const { data: profile, error: profileError } = await supabase
-      .from("profiles")
+      .from("profil")
       .select("role, uid_guru")
-      .eq("id", userData.user.id)
+      .eq("user_id", userData.user.id)
       .single()
 
     if (profileError || !profile || profile.role !== "guru") {
@@ -122,7 +122,7 @@ export default function GuruPembagianMengajarPage() {
       supabase
         .from("mapel_kelas_guru")
         .select(`
-          id_mapel_kelas_guru,
+          id_mkg,
           uid_guru,
           id_mapel,
           id_kelas,
@@ -197,7 +197,7 @@ export default function GuruPembagianMengajarPage() {
 
     const { data: existing, error: checkError } = await supabase
       .from("mapel_kelas_guru")
-      .select("id_mapel_kelas_guru")
+      .select("id_mkg")
       .eq("uid_guru", guru.uid)
       .eq("id_mapel", idMapel)
       .eq("id_kelas", idKelas)
@@ -242,7 +242,7 @@ export default function GuruPembagianMengajarPage() {
     const { error } = await supabase
       .from("mapel_kelas_guru")
       .delete()
-      .eq("id_mapel_kelas_guru", id)
+      .eq("id_mkg", id)
       .eq("uid_guru", guru?.uid ?? "")
 
     if (error) {
@@ -379,7 +379,7 @@ export default function GuruPembagianMengajarPage() {
 
                 return (
                   <div
-                    key={item.id_mapel_kelas_guru}
+                    key={item.id_mkg}
                     className="rounded-xl border p-4 shadow-sm dark:border-gray-800"
                   >
                     <p className="font-semibold text-gray-800 dark:text-white">
@@ -392,7 +392,7 @@ export default function GuruPembagianMengajarPage() {
 
                     <button
                       type="button"
-                      onClick={() => handleDelete(item.id_mapel_kelas_guru)}
+                      onClick={() => handleDelete(item.id_mkg)}
                       className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700"
                     >
                       <Trash2 size={16} />
@@ -443,7 +443,7 @@ export default function GuruPembagianMengajarPage() {
 
                     return (
                       <tr
-                        key={item.id_mapel_kelas_guru}
+                        key={item.id_mkg}
                         className="border-b border-gray-100 dark:border-gray-800"
                       >
                         <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
@@ -463,7 +463,7 @@ export default function GuruPembagianMengajarPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              handleDelete(item.id_mapel_kelas_guru)
+                              handleDelete(item.id_mkg)
                             }
                             className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300"
                           >

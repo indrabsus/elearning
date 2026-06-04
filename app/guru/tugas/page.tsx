@@ -23,14 +23,14 @@ type Kelas = {
 }
 
 type Mengajar = {
-  id_mapel_kelas_guru: string
+  id_mkg: string
   mapel: Mapel | Mapel[] | null
   kelas: Kelas | Kelas[] | null
 }
 
 type Tugas = {
   id_tugas: string
-  id_mapel_kelas_guru: string
+  id_mkg: string
   judul: string
   deskripsi: string | null
   deadline: string | null
@@ -81,9 +81,9 @@ export default function GuruTugasPage() {
     }
 
     const { data: profile } = await supabase
-      .from("profiles")
+      .from("profil")
       .select("role, uid_guru")
-      .eq("id", userData.user.id)
+      .eq("user_id", userData.user.id)
       .single()
 
     if (!profile || profile.role !== "guru") {
@@ -123,7 +123,7 @@ export default function GuruTugasPage() {
     const { data: mengajarData, error: mengajarError } = await supabase
       .from("mapel_kelas_guru")
       .select(`
-        id_mapel_kelas_guru,
+        id_mkg,
         mapel:id_mapel (
           nama_mapel
         ),
@@ -146,7 +146,7 @@ export default function GuruTugasPage() {
 
     setMengajarList(daftarMengajar)
 
-    const ids = daftarMengajar.map((item) => item.id_mapel_kelas_guru)
+    const ids = daftarMengajar.map((item) => item.id_mkg)
 
     if (ids.length === 0) {
       setTugasList([])
@@ -158,15 +158,15 @@ export default function GuruTugasPage() {
       .from("tugas")
       .select(`
         id_tugas,
-        id_mapel_kelas_guru,
+        id_mkg,
         judul,
         deskripsi,
         deadline,
         status,
         tipe_tugas,
         created_at,
-        mapel_kelas_guru:id_mapel_kelas_guru (
-          id_mapel_kelas_guru,
+        mapel_kelas_guru:id_mkg (
+          id_mkg,
           mapel:id_mapel (
             nama_mapel
           ),
@@ -176,7 +176,7 @@ export default function GuruTugasPage() {
           )
         )
       `)
-      .in("id_mapel_kelas_guru", ids)
+      .in("id_mkg", ids)
       .order("created_at", { ascending: false })
 
     if (tugasError) {
@@ -218,7 +218,7 @@ export default function GuruTugasPage() {
     setSaving(true)
 
     const payload = {
-      id_mapel_kelas_guru: idMengajar,
+      id_mkg: idMengajar,
       judul,
       deskripsi: deskripsi || null,
       deadline: deadline ? new Date(deadline).toISOString() : null,
@@ -254,7 +254,7 @@ export default function GuruTugasPage() {
 
   const handleEdit = (item: Tugas) => {
     setEditId(item.id_tugas)
-    setIdMengajar(item.id_mapel_kelas_guru)
+    setIdMengajar(item.id_mkg)
     setJudul(item.judul)
     setDeskripsi(item.deskripsi ?? "")
     setStatus(item.status ?? "aktif")
@@ -415,8 +415,8 @@ export default function GuruTugasPage() {
                 <option value="">Pilih Mapel dan Kelas</option>
                 {mengajarList.map((item) => (
                   <option
-                    key={item.id_mapel_kelas_guru}
-                    value={item.id_mapel_kelas_guru}
+                    key={item.id_mkg}
+                    value={item.id_mkg}
                   >
                     {getMengajarLabel(item)}
                   </option>

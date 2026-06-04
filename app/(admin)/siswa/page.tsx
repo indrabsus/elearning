@@ -11,16 +11,17 @@ import {
 import { supabase } from "@/lib/supabase";
 
 type Siswa = {
-  id_siswa: string
-  nama_lengkap: string | null
-  tempat_lahir: string | null
-  tanggal_lahir: string | null
-  jenkel: string | null
-  agama: string | null
-  tahun_masuk: number | null
-  created_at?: string
-  kelas_text?: string
-}
+  id_siswa: string;
+  no_skulio: number | null;
+  nama_lengkap: string | null;
+  tempat_lahir: string | null;
+  tanggal_lahir: string | null;
+  jenkel: string | null;
+  agama: string | null;
+  tahun_masuk: number | null;
+  created_at?: string;
+  kelas_text?: string;
+};
 
 const ITEMS_PER_PAGE = 10;
 
@@ -29,49 +30,46 @@ const fetchAll = async (
   selectQuery: string,
   orderColumn?: string
 ) => {
-  const pageSize = 1000
-  let from = 0
-  let to = pageSize - 1
-  let allData: any[] = []
-  let hasMore = true
+  const pageSize = 1000;
+  let from = 0;
+  let to = pageSize - 1;
+  let allData: any[] = [];
+  let hasMore = true;
 
   while (hasMore) {
-    let query = supabase
-      .from(table)
-      .select(selectQuery)
-      .range(from, to)
+    let query = supabase.from(table).select(selectQuery).range(from, to);
 
     if (orderColumn) {
-      query = query.order(orderColumn, { ascending: true })
+      query = query.order(orderColumn, { ascending: true });
     }
 
-    const { data, error } = await query
+    const { data, error } = await query;
 
     if (error) {
-      console.error(error.message)
-      break
+      console.error(error.message);
+      break;
     }
 
-    allData = [...allData, ...(data ?? [])]
+    allData = [...allData, ...(data ?? [])];
 
     if (!data || data.length < pageSize) {
-      hasMore = false
+      hasMore = false;
     } else {
-      from += pageSize
-      to += pageSize
+      from += pageSize;
+      to += pageSize;
     }
   }
 
-  return allData
-}
+  return allData;
+};
 
 const getSiswaData = async (): Promise<Siswa[]> => {
-  const idTahunAjaran = localStorage.getItem("id_tahun_ajaran") || ""
+  const idTahunAjaran = localStorage.getItem("id_tahun_ajaran") || "";
 
-  const siswaData = await fetchAll("siswa", "*", "nama_lengkap")
+  const siswaData = await fetchAll("siswa", "*", "nama_lengkap");
 
   if (!idTahunAjaran) {
-    return siswaData ?? []
+    return siswaData ?? [];
   }
 
   const siswaKelasData = await fetchAll(
@@ -79,44 +77,33 @@ const getSiswaData = async (): Promise<Siswa[]> => {
     `
       id_siswa,
       id_kelas,
+      id_tahun_ajaran,
       kelas:id_kelas (
         tingkat,
         nama_kelas
       )
     `
-  )
+  );
 
   const siswaKelasFiltered = siswaKelasData.filter(
     (item) => item.id_tahun_ajaran === idTahunAjaran
-  )
+  );
 
-  const kelasMap = new Map<string, string>()
+  const kelasMap = new Map<string, string>();
 
   siswaKelasFiltered.forEach((item: any) => {
-    const kelas = Array.isArray(item.kelas) ? item.kelas[0] : item.kelas
+    const kelas = Array.isArray(item.kelas) ? item.kelas[0] : item.kelas;
 
     kelasMap.set(
       item.id_siswa,
-      kelas
-        ? `${kelas.tingkat ?? "-"} ${kelas.nama_kelas ?? "-"}`
-        : "-"
-    )
-  })
+      kelas ? `${kelas.tingkat ?? "-"} ${kelas.nama_kelas ?? "-"}` : "-"
+    );
+  });
 
   return siswaData.map((item) => ({
     ...item,
     kelas_text: kelasMap.get(item.id_siswa) ?? "Belum dapat kelas",
-  }))
-}
-
-const formatTanggal = (tanggal: string | null) => {
-  if (!tanggal) return "-";
-
-  return new Date(tanggal).toLocaleDateString("id-ID", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+  }));
 };
 
 export default function KelolaSiswaPage() {
@@ -126,7 +113,7 @@ export default function KelolaSiswaPage() {
 
   const [search, setSearch] = useState("");
 
-  const [nisn, setNisn] = useState("");
+  const [noSkulio, setNoSkulio] = useState("");
   const [namaLengkap, setNamaLengkap] = useState("");
   const [tempatLahir, setTempatLahir] = useState("");
   const [tanggalLahir, setTanggalLahir] = useState("");
@@ -137,10 +124,8 @@ export default function KelolaSiswaPage() {
   const [editId, setEditId] = useState<string | null>(null);
 
   const [page, setPage] = useState(1);
-  const [sortKey, setSortKey] =
-    useState<keyof Siswa>("nama_lengkap");
-  const [sortDirection, setSortDirection] =
-    useState<"asc" | "desc">("asc");
+  const [sortKey, setSortKey] = useState<keyof Siswa>("nama_lengkap");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const reloadSiswa = async () => {
     setLoading(true);
@@ -158,7 +143,7 @@ export default function KelolaSiswaPage() {
   }, [search]);
 
   const resetForm = () => {
-    setNisn("");
+    setNoSkulio("");
     setNamaLengkap("");
     setTempatLahir("");
     setTanggalLahir("");
@@ -170,9 +155,7 @@ export default function KelolaSiswaPage() {
 
   const handleSort = (key: keyof Siswa) => {
     if (sortKey === key) {
-      setSortDirection((prev) =>
-        prev === "asc" ? "desc" : "asc"
-      );
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
     } else {
       setSortKey(key);
       setSortDirection("asc");
@@ -181,13 +164,10 @@ export default function KelolaSiswaPage() {
     setPage(1);
   };
 
-  const handleSubmit = async (
-    e: React.BaseSyntheticEvent
-  ) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (
-      !nisn ||
       !namaLengkap ||
       !tempatLahir ||
       !tanggalLahir ||
@@ -214,7 +194,7 @@ export default function KelolaSiswaPage() {
       const { error } = await supabase
         .from("siswa")
         .update(payload)
-        .eq("nisn", editId);
+        .eq("id_siswa", editId);
 
       if (error) {
         alert(error.message);
@@ -222,10 +202,7 @@ export default function KelolaSiswaPage() {
         return;
       }
     } else {
-      const { error } = await supabase.from("siswa").insert({
-        nisn,
-        ...payload,
-      });
+      const { error } = await supabase.from("siswa").insert(payload);
 
       if (error) {
         alert(error.message);
@@ -241,8 +218,7 @@ export default function KelolaSiswaPage() {
 
   const handleEdit = (item: Siswa) => {
     setEditId(item.id_siswa);
-
-    setNisn(item.id_siswa ?? "");
+    setNoSkulio(String(item.no_skulio ?? ""));
     setNamaLengkap(item.nama_lengkap ?? "");
     setTempatLahir(item.tempat_lahir ?? "");
     setTanggalLahir(item.tanggal_lahir ?? "");
@@ -252,9 +228,7 @@ export default function KelolaSiswaPage() {
   };
 
   const handleDelete = async (id_siswa: string) => {
-    const confirmDelete = confirm(
-      "Yakin ingin menghapus data siswa ini?"
-    );
+    const confirmDelete = confirm("Yakin ingin menghapus data siswa ini?");
 
     if (!confirmDelete) return;
 
@@ -275,34 +249,25 @@ export default function KelolaSiswaPage() {
     const keyword = search.toLowerCase();
 
     return (
-  String(item.id_siswa ?? "").toLowerCase().includes(keyword) ||
-  String(item.nama_lengkap ?? "").toLowerCase().includes(keyword) ||
-  String(item.kelas_text ?? "").toLowerCase().includes(keyword) ||
-  String(item.tempat_lahir ?? "").toLowerCase().includes(keyword) ||
-  String(item.jenkel ?? "").toLowerCase().includes(keyword) ||
-  String(item.agama ?? "").toLowerCase().includes(keyword) ||
-  String(item.tahun_masuk ?? "").includes(keyword)
-)
+      String(item.no_skulio ?? "").toLowerCase().includes(keyword) ||
+      String(item.nama_lengkap ?? "").toLowerCase().includes(keyword) ||
+      String(item.kelas_text ?? "").toLowerCase().includes(keyword) ||
+      String(item.jenkel ?? "").toLowerCase().includes(keyword) ||
+      String(item.agama ?? "").toLowerCase().includes(keyword)
+    );
   });
 
   const sortedSiswa = [...filteredSiswa].sort((a, b) => {
     const aValue = String(a[sortKey] ?? "").toLowerCase();
     const bValue = String(b[sortKey] ?? "").toLowerCase();
 
-    if (aValue < bValue) {
-      return sortDirection === "asc" ? -1 : 1;
-    }
-
-    if (aValue > bValue) {
-      return sortDirection === "asc" ? 1 : -1;
-    }
+    if (aValue < bValue) return sortDirection === "asc" ? -1 : 1;
+    if (aValue > bValue) return sortDirection === "asc" ? 1 : -1;
 
     return 0;
   });
 
-  const totalPages = Math.ceil(
-    sortedSiswa.length / ITEMS_PER_PAGE
-  );
+  const totalPages = Math.ceil(sortedSiswa.length / ITEMS_PER_PAGE);
 
   const paginatedSiswa = sortedSiswa.slice(
     (page - 1) * ITEMS_PER_PAGE,
@@ -327,22 +292,17 @@ export default function KelolaSiswaPage() {
             {editId ? "Edit Siswa" : "Tambah Siswa"}
           </h2>
 
-          <form
-            onSubmit={handleSubmit}
-            className="mt-4 space-y-4"
-          >
+          <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                NISN
+                No Skulio
               </label>
 
               <input
                 type="text"
-                placeholder="Masukkan NISN"
-                value={nisn}
-                onChange={(e) => setNisn(e.target.value)}
-                disabled={!!editId}
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:disabled:bg-gray-800"
+                value={noSkulio || "Otomatis"}
+                disabled
+                className="mt-2 w-full rounded-xl border border-gray-300 bg-gray-100 px-4 py-2 text-gray-500 outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
               />
             </div>
 
@@ -355,9 +315,7 @@ export default function KelolaSiswaPage() {
                 type="text"
                 placeholder="Masukkan nama lengkap"
                 value={namaLengkap}
-                onChange={(e) =>
-                  setNamaLengkap(e.target.value)
-                }
+                onChange={(e) => setNamaLengkap(e.target.value)}
                 className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
               />
             </div>
@@ -372,9 +330,7 @@ export default function KelolaSiswaPage() {
                   type="text"
                   placeholder="Contoh: Bandung"
                   value={tempatLahir}
-                  onChange={(e) =>
-                    setTempatLahir(e.target.value)
-                  }
+                  onChange={(e) => setTempatLahir(e.target.value)}
                   className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
                 />
               </div>
@@ -387,9 +343,7 @@ export default function KelolaSiswaPage() {
                 <input
                   type="date"
                   value={tanggalLahir}
-                  onChange={(e) =>
-                    setTanggalLahir(e.target.value)
-                  }
+                  onChange={(e) => setTanggalLahir(e.target.value)}
                   className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
                 />
               </div>
@@ -407,8 +361,8 @@ export default function KelolaSiswaPage() {
                   className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
                 >
                   <option value="">Pilih</option>
-                  <option value="L">Laki-laki</option>
-                  <option value="P">Perempuan</option>
+                  <option value="l">Laki-laki</option>
+                  <option value="p">Perempuan</option>
                 </select>
               </div>
 
@@ -449,11 +403,7 @@ export default function KelolaSiswaPage() {
               >
                 <Plus size={18} />
 
-                {saving
-                  ? "Menyimpan..."
-                  : editId
-                  ? "Update"
-                  : "Tambah"}
+                {saving ? "Menyimpan..." : editId ? "Update" : "Tambah"}
               </button>
 
               {editId && (
@@ -485,74 +435,84 @@ export default function KelolaSiswaPage() {
                 type="text"
                 placeholder="Cari siswa..."
                 value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
-                }
+                onChange={(e) => setSearch(e.target.value)}
                 className="w-full rounded-xl border border-gray-300 bg-white py-2 pl-10 pr-4 text-gray-800 outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white sm:w-64"
               />
             </div>
           </div>
 
           <div className="mt-5 space-y-4 md:hidden">
-  {loading ? (
-    <div className="rounded-xl border p-6 text-center text-gray-500">
-      Loading data...
-    </div>
-  ) : paginatedSiswa.length === 0 ? (
-    <div className="rounded-xl border p-6 text-center text-gray-500">
-      Data siswa belum ada.
-    </div>
-  ) : (
-    paginatedSiswa.map((item, index) => (
-      <div
-        key={item.id_siswa}
-        className="rounded-xl border p-4 shadow-sm dark:border-gray-800"
-      >
-        <p className="break-words font-semibold">
-          {index + 1}. {item.nama_lengkap || "-"}
-        </p>
+            {loading ? (
+              <div className="rounded-xl border p-6 text-center text-gray-500">
+                Loading data...
+              </div>
+            ) : paginatedSiswa.length === 0 ? (
+              <div className="rounded-xl border p-6 text-center text-gray-500">
+                Data siswa belum ada.
+              </div>
+            ) : (
+              paginatedSiswa.map((item, index) => (
+                <div
+                  key={item.id_siswa}
+                  className="rounded-xl border p-4 shadow-sm dark:border-gray-800"
+                >
+                  <p className="break-words font-semibold">
+                    {(page - 1) * ITEMS_PER_PAGE + index + 1}.{" "}
+                    {item.nama_lengkap || "-"}
+                  </p>
 
-        <div className="mt-3 space-y-1 text-sm text-gray-600 dark:text-gray-300">
-          <p><b>NISN:</b> {item.nisn}</p>
-          <p>
-  <b>Kelas:</b>{" "}
-  <span
-    className={
-      item.kelas_text === "Belum dapat kelas"
-        ? "text-red-600 font-semibold"
-        : "text-green-600 font-semibold"
-    }
-  >
-    {item.kelas_text ?? "Belum dapat kelas"}
-  </span>
-</p>
-          <p><b>TTL:</b> {item.tempat_lahir || "-"}, {formatTanggal(item.tanggal_lahir)}</p>
-          <p><b>JK:</b> {item.jenkel || "-"}</p>
-          <p><b>Agama:</b> {item.agama || "-"}</p>
-          <p><b>Tahun Masuk:</b> {item.tahun_masuk || "-"}</p>
-        </div>
+                  <div className="mt-3 space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                    <p>
+                      <b>No Skulio:</b> {item.no_skulio || "-"}
+                    </p>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => handleEdit(item)}
-            className="rounded-lg bg-yellow-500 py-2 text-sm text-white"
-          >
-            Edit
-          </button>
+                    <p>
+                      <b>Kelas:</b>{" "}
+                      <span
+                        className={
+                          item.kelas_text === "Belum dapat kelas"
+                            ? "font-semibold text-red-600"
+                            : "font-semibold text-green-600"
+                        }
+                      >
+                        {item.kelas_text ?? "Belum dapat kelas"}
+                      </span>
+                    </p>
 
-          <button
-            type="button"
-            onClick={() => handleDelete(item.nisn)}
-            className="rounded-lg bg-red-600 py-2 text-sm text-white"
-          >
-            Hapus
-          </button>
-        </div>
-      </div>
-    ))
-  )}
-</div>
+                    <p>
+                      <b>Nama:</b> {item.nama_lengkap || "-"}
+                    </p>
+
+                    <p>
+                      <b>JK:</b> {item.jenkel == 'l' ? 'Laki-laki' : 'Perempuan'}
+                    </p>
+
+                    <p>
+                      <b>Agama:</b> {item.agama || "-"}
+                    </p>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(item)}
+                      className="rounded-lg bg-yellow-500 py-2 text-sm text-white"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(item.id_siswa)}
+                      className="rounded-lg bg-red-600 py-2 text-sm text-white"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
 
           <div className="mt-5 hidden overflow-x-auto md:block">
             <table className="w-full border-collapse text-sm">
@@ -565,21 +525,18 @@ export default function KelolaSiswaPage() {
                   <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
                     <button
                       type="button"
-                      onClick={() =>
-                        handleSort("nisn")
-                      }
+                      onClick={() => handleSort("no_skulio")}
                       className="inline-flex items-center gap-1 hover:text-blue-600"
                     >
-                      NISN
+                      No Skulio
                       <ArrowUpDown size={14} />
                     </button>
                   </th>
+
                   <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
                     <button
                       type="button"
-                      onClick={() =>
-                        handleSort("kelas_text")
-                      }
+                      onClick={() => handleSort("kelas_text")}
                       className="inline-flex items-center gap-1 hover:text-blue-600"
                     >
                       Kelas
@@ -590,9 +547,7 @@ export default function KelolaSiswaPage() {
                   <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
                     <button
                       type="button"
-                      onClick={() =>
-                        handleSort("nama_lengkap")
-                      }
+                      onClick={() => handleSort("nama_lengkap")}
                       className="inline-flex items-center gap-1 hover:text-blue-600"
                     >
                       Nama
@@ -601,24 +556,11 @@ export default function KelolaSiswaPage() {
                   </th>
 
                   <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
-                    TTL
-                  </th>
-
-                  <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
                     JK
                   </th>
 
                   <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleSort("tahun_masuk")
-                      }
-                      className="inline-flex items-center gap-1 hover:text-blue-600"
-                    >
-                      Tahun
-                      <ArrowUpDown size={14} />
-                    </button>
+                    Agama
                   </th>
 
                   <th className="py-3 pr-4 text-gray-500 dark:text-gray-400">
@@ -653,14 +595,13 @@ export default function KelolaSiswaPage() {
                       className="border-b border-gray-100 dark:border-gray-800"
                     >
                       <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
-                        {(page - 1) * ITEMS_PER_PAGE +
-                          index +
-                          1}
+                        {(page - 1) * ITEMS_PER_PAGE + index + 1}
                       </td>
 
                       <td className="py-3 pr-4 font-medium text-gray-800 dark:text-white">
-                        {item.nisn}
+                        {item.no_skulio || "-"}
                       </td>
+
                       <td className="py-3 pr-4 font-medium text-gray-800 dark:text-white">
                         {item.kelas_text === "Belum dapat kelas" ? (
                           <span className="text-red-500">-</span>
@@ -670,29 +611,22 @@ export default function KelolaSiswaPage() {
                       </td>
 
                       <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
-                        {item.nama_lengkap}
-                      </td>
-
-                      <td className="min-w-48 py-3 pr-4 text-gray-700 dark:text-gray-300">
-                        {item.tempat_lahir},{" "}
-                        {formatTanggal(item.tanggal_lahir)}
+                        {item.nama_lengkap || "-"}
                       </td>
 
                       <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
-                        {item.jenkel}
+                        {item.jenkel == 'l' ? 'Laki-laki' : item.jenkel == 'p' ? 'Perempuan' : '-'}
                       </td>
 
                       <td className="py-3 pr-4 text-gray-700 dark:text-gray-300">
-                        {item.tahun_masuk}
+                        {item.agama || "-"}
                       </td>
 
                       <td className="py-3 pr-4">
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() =>
-                              handleEdit(item)
-                            }
+                            onClick={() => handleEdit(item)}
                             className="rounded-lg bg-yellow-100 p-2 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-950 dark:text-yellow-300"
                           >
                             <Pencil size={16} />
@@ -700,9 +634,7 @@ export default function KelolaSiswaPage() {
 
                           <button
                             type="button"
-                            onClick={() =>
-                              handleDelete(item.nisn)
-                            }
+                            onClick={() => handleDelete(item.id_siswa)}
                             className="rounded-lg bg-red-100 p-2 text-red-700 hover:bg-red-200 dark:bg-red-950 dark:text-red-300"
                           >
                             <Trash2 size={16} />
@@ -725,9 +657,7 @@ export default function KelolaSiswaPage() {
               <button
                 type="button"
                 disabled={page === 1}
-                onClick={() =>
-                  setPage((prev) => prev - 1)
-                }
+                onClick={() => setPage((prev) => prev - 1)}
                 className="rounded-lg border border-gray-300 px-3 py-1 text-sm disabled:opacity-50 dark:border-gray-700"
               >
                 Sebelumnya
@@ -739,13 +669,8 @@ export default function KelolaSiswaPage() {
 
               <button
                 type="button"
-                disabled={
-                  page === totalPages ||
-                  totalPages === 0
-                }
-                onClick={() =>
-                  setPage((prev) => prev + 1)
-                }
+                disabled={page === totalPages || totalPages === 0}
+                onClick={() => setPage((prev) => prev + 1)}
                 className="rounded-lg border border-gray-300 px-3 py-1 text-sm disabled:opacity-50 dark:border-gray-700"
               >
                 Berikutnya

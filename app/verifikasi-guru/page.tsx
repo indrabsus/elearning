@@ -37,6 +37,19 @@ type PilihanMengajar = {
   id_kelas: string
 }
 
+type MengajarAktif = {
+  id_mkg: string
+  id_mapel: string
+  id_kelas: string
+  mapel: {
+    nama_mapel: string | null
+  } | null
+  kelas: {
+    tingkat: number | null
+    nama_kelas: string | null
+  } | null
+}
+
 function VerifikasiGuruContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -51,6 +64,7 @@ function VerifikasiGuruContent() {
 
   const [kelasList, setKelasList] = useState<Kelas[]>([])
   const [mapelList, setMapelList] = useState<Mapel[]>([])
+  const [mengajarAktif, setMengajarAktif] = useState<MengajarAktif[]>([])
 
   const [idTahunAjaran, setIdTahunAjaran] = useState("")
   const [namaTahunAjaran, setNamaTahunAjaran] = useState("")
@@ -66,8 +80,42 @@ function VerifikasiGuruContent() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
+  const loadMengajarAktif = async (
+    uidGuru: string,
+    tahunAjaranId: string
+  ) => {
+    if (!uidGuru || !tahunAjaranId) return
+
+    const { data, error } = await supabase
+      .from("mapel_kelas_guru")
+      .select(`
+        id_mkg,
+        id_mapel,
+        id_kelas,
+        mapel:id_mapel (
+          nama_mapel
+        ),
+        kelas:id_kelas (
+          tingkat,
+          nama_kelas
+        )
+      `)
+      .eq("uid_guru", uidGuru)
+      .eq("id_tahun_ajaran", tahunAjaranId)
+      .order("created_at", { ascending: true })
+
+    if (error) {
+      setError(error.message)
+      return
+    }
+
+    setMengajarAktif((data ?? []) as unknown as MengajarAktif[])
+  }
+
   useEffect(() => {
     const initPage = async () => {
+      setError("")
+
       const tahunId = localStorage.getItem("id_tahun_ajaran") || ""
       const tahunNama = localStorage.getItem("nama_tahun_ajaran") || ""
 
@@ -87,35 +135,14 @@ function VerifikasiGuruContent() {
       }
 
       const { data: profile, error: profileError } = await supabase
-        .from("profiles")
+        .from("profil")
         .select("role, uid_guru")
-        .eq("id", userData.user.id)
+        .eq("user_id", userData.user.id)
         .single()
 
       if (profileError || !profile || profile.role !== "guru") {
         router.push("/")
         return
-      }
-
-      if (profile.uid_guru) {
-        const { data: guruData } = await supabase
-          .from("guru")
-          .select("uid, no_hp, nama_lengkap")
-          .eq("uid", profile.uid_guru)
-          .single()
-
-        if (guruData) {
-          setGuru(guruData as Guru)
-          setUid(String(guruData.uid))
-          setNoHp(String(guruData.no_hp ?? ""))
-          setMode("mengajar")
-        }
-      } else {
-        setMode("verifikasi")
-      }
-
-      if (modeParam === "mengajar") {
-        setMode("mengajar")
       }
 
       const [kelasRes, mapelRes] = await Promise.all([
@@ -143,16 +170,40 @@ function VerifikasiGuruContent() {
 
       setKelasList((kelasRes.data ?? []) as Kelas[])
       setMapelList((mapelRes.data ?? []) as Mapel[])
+
+      if (profile.uid_guru) {
+        const { data: guruData } = await supabase
+          .from("guru")
+          .select("uid, no_hp, nama_lengkap")
+          .eq("uid", profile.uid_guru)
+          .single()
+
+        if (guruData) {
+          setGuru(guruData as Guru)
+          setUid(String(guruData.uid))
+          setNoHp(String(guruData.no_hp ?? ""))
+          setMode("mengajar")
+
+          await loadMengajarAktif(String(guruData.uid), tahunId)
+        }
+      } else {
+        setMode("verifikasi")
+      }
+
+      if (modeParam === "mengajar") {
+        setMode("mengajar")
+      }
     }
 
     initPage()
   }, [router, modeParam])
 
-  const cekGuru = async (e: React.BaseSyntheticEvent) => {
+  const cekGuru = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     setError("")
     setGuru(null)
+    setMengajarAktif([])
 
     const uidTrim = uid.trim()
     const noHpTrim = noHp.trim()
@@ -185,6 +236,9 @@ function VerifikasiGuruContent() {
 
     setGuru(data as Guru)
     setMode("mengajar")
+
+    await loadMengajarAktif(String(data.uid), idTahunAjaran)
+
     setLoading(false)
   }
 
@@ -199,9 +253,7 @@ function VerifikasiGuruContent() {
   }
 
   const hapusPilihanMengajar = (index: number) => {
-    setPilihanMengajar((prev) =>
-      prev.filter((_, i) => i !== index)
-    )
+    setPilihanMengajar((prev) => prev.filter((_, i) => i !== index))
   }
 
   const ubahPilihanMengajar = (
@@ -222,128 +274,59 @@ function VerifikasiGuruContent() {
   }
 
   const simpanVerifikasiGuru = async () => {
-    if (!guru) {
-      setError("Data guru belum diverifikasi")
-      return
-    }
-
-    if (!idTahunAjaran) {
-      setError("Tahun ajaran belum dipilih. Silakan login ulang.")
-      return
-    }
-
-    setError("")
-    setLoading(true)
-
-    const pilihanValid = pilihanMengajar.filter(
-      (item) => item.id_mapel && item.id_kelas
-    )
-
-    if (pilihanValid.length === 0) {
-      setError("Minimal pilih satu mapel dan kelas")
-      setLoading(false)
-      return
-    }
-
-    const kombinasiForm = pilihanValid.map(
-      (item) => `${item.id_mapel}-${item.id_kelas}`
-    )
-
-    const adaDuplikatDiForm =
-      new Set(kombinasiForm).size !== kombinasiForm.length
-
-    if (adaDuplikatDiForm) {
-      setError("Ada pilihan mapel dan kelas yang duplikat")
-      setLoading(false)
-      return
-    }
-
-    const { data: userData, error: userError } =
-      await supabase.auth.getUser()
-
-    if (userError || !userData.user) {
-      setError("Session tidak ditemukan. Silakan login ulang.")
-      setLoading(false)
-      router.push("/")
-      return
-    }
-
-    const { data: existingProfile, error: existingProfileError } =
-      await supabase
-        .from("profiles")
-        .select("id")
-        .eq("uid_guru", guru.uid)
-        .neq("id", userData.user.id)
-        .maybeSingle()
-
-    if (existingProfileError) {
-      setError(existingProfileError.message)
-      setLoading(false)
-      return
-    }
-
-    if (existingProfile) {
-      setError("UID guru sudah digunakan akun lain")
-      setLoading(false)
-      return
-    }
-
-    const dataInsert = pilihanValid.map((item) => ({
-      uid_guru: guru.uid,
-      id_mapel: item.id_mapel,
-      id_kelas: item.id_kelas,
-      id_tahun_ajaran: idTahunAjaran,
-    }))
-
-    for (const item of dataInsert) {
-      const { data: existingMengajar, error: existingMengajarError } =
-        await supabase
-          .from("mapel_kelas_guru")
-          .select("id_mapel_kelas_guru")
-          .eq("uid_guru", item.uid_guru)
-          .eq("id_mapel", item.id_mapel)
-          .eq("id_kelas", item.id_kelas)
-          .eq("id_tahun_ajaran", item.id_tahun_ajaran)
-          .maybeSingle()
-
-      if (existingMengajarError) {
-        setError(existingMengajarError.message)
-        setLoading(false)
-        return
-      }
-
-      if (existingMengajar) {
-        setError("Pembagian mengajar tersebut sudah ada di tahun ajaran ini")
-        setLoading(false)
-        return
-      }
-    }
-
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .update({
-        uid_guru: guru.uid,
-      })
-      .eq("id", userData.user.id)
-
-    if (profileError) {
-      setError(profileError.message)
-      setLoading(false)
-      return
-    }
-
-    const { error: mengajarError } = await supabase
-      .from("mapel_kelas_guru")
-      .insert(dataInsert)
-
-    if (mengajarError) {
-      setError(mengajarError.message)
-      setLoading(false)
-      return
-    }
-
-    router.push("/guru/dashboard")
+  if (!guru) {
+    setError("Data guru belum diverifikasi")
+    return
   }
+
+  if (!idTahunAjaran) {
+    setError("Tahun ajaran belum dipilih. Silakan login ulang.")
+    return
+  }
+
+  setError("")
+  setLoading(true)
+
+  const { data: userData, error: userError } =
+    await supabase.auth.getUser()
+
+  if (userError || !userData.user) {
+    setError("Session tidak ditemukan. Silakan login ulang.")
+    setLoading(false)
+    router.push("/")
+    return
+  }
+
+  const { error: profileError } = await supabase
+    .from("profil")
+    .update({
+      uid_guru: guru.uid,
+    })
+    .eq("user_id", userData.user.id)
+
+  if (profileError) {
+    setError(profileError.message)
+    setLoading(false)
+    return
+  }
+
+  const pilihanValid = pilihanMengajar.filter(
+    (item) => item.id_mapel && item.id_kelas
+  )
+
+  if (pilihanValid.length === 0 && mengajarAktif.length === 0) {
+    setError("Minimal pilih satu mapel dan kelas")
+    setLoading(false)
+    return
+  }
+
+  if (pilihanValid.length === 0 && mengajarAktif.length > 0) {
+    router.push("/guru/dashboard")
+    return
+  }
+
+  // lanjut kode validasi duplikat dan insert mapel_kelas_guru...
+}
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-4 dark:bg-slate-950">
@@ -410,9 +393,40 @@ function VerifikasiGuruContent() {
               </div>
 
               <div className="rounded-xl border bg-white p-4 shadow-sm dark:bg-slate-900">
+                <h3 className="mb-3 text-lg font-semibold">
+                  Pembagian Mengajar Saat Ini
+                </h3>
+
+                {mengajarAktif.length > 0 ? (
+                  <div className="space-y-2">
+                    {mengajarAktif.map((item, index) => (
+                      <div
+                        key={item.id_mkg}
+                        className="rounded-lg border bg-slate-50 p-3 text-sm dark:bg-slate-800"
+                      >
+                        <b>
+                          {index + 1}.{" "}
+                          {item.mapel?.nama_mapel || "Mapel tidak ditemukan"}
+                        </b>
+
+                        <div className="mt-1 text-slate-500 dark:text-slate-400">
+                          Kelas: {item.kelas?.tingkat || "-"} -{" "}
+                          {item.kelas?.nama_kelas || "Kelas tidak ditemukan"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border bg-yellow-50 p-3 text-sm text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300">
+                    Guru ini belum memiliki pembagian mengajar pada tahun ajaran ini.
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border bg-white p-4 shadow-sm dark:bg-slate-900">
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="text-lg font-semibold">
-                    Pilih Mapel dan Kelas
+                    Tambah Mapel dan Kelas
                   </h3>
 
                   <Button

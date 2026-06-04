@@ -21,7 +21,7 @@ type Mapel = {
 }
 
 type Mengajar = {
-  id_mapel_kelas_guru: string
+  id_mkg: string
   kelas: Kelas | Kelas[] | null
   mapel: Mapel | Mapel[] | null
 }
@@ -65,9 +65,9 @@ export default function GuruDashboardPage() {
       }
 
       const { data: profile } = await supabase
-        .from("profiles")
+        .from("profil")
         .select("role, uid_guru")
-        .eq("id", userData.user.id)
+        .eq("user_id", userData.user.id)
         .single()
 
       if (!profile || profile.role !== "guru") {
@@ -98,7 +98,7 @@ export default function GuruDashboardPage() {
       const { data: mengajarData, error: mengajarError } = await supabase
         .from("mapel_kelas_guru")
         .select(`
-          id_mapel_kelas_guru,
+          id_mkg,
           kelas:id_kelas (
             tingkat,
             nama_kelas
@@ -132,19 +132,19 @@ export default function GuruDashboardPage() {
       setTotalKelas(kelasUnik.size)
 
       const idMengajar = dataMengajar.map(
-        (item) => item.id_mapel_kelas_guru
+        (item) => item.id_mkg
       )
 
       if (idMengajar.length > 0) {
         const { count: materiCount } = await supabase
           .from("materi")
           .select("*", { count: "exact", head: true })
-          .in("id_mapel_kelas_guru", idMengajar)
+          .in("id_mkg", idMengajar)
 
         const { count: tugasCount } = await supabase
           .from("tugas")
           .select("*", { count: "exact", head: true })
-          .in("id_mapel_kelas_guru", idMengajar)
+          .in("id_mkg", idMengajar)
 
         setTotalMateri(materiCount ?? 0)
         setTotalTugas(tugasCount ?? 0)
@@ -224,7 +224,7 @@ export default function GuruDashboardPage() {
 
                 return (
                   <div
-                    key={item.id_mapel_kelas_guru}
+                    key={item.id_mkg}
                     className="rounded-xl border p-4 text-sm dark:border-slate-800"
                   >
                     <p className="font-semibold">

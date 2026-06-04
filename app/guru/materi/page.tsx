@@ -21,14 +21,14 @@ type Kelas = {
 }
 
 type Mengajar = {
-  id_mapel_kelas_guru: string
+  id_mkg: string
   mapel: Mapel | Mapel[] | null
   kelas: Kelas | Kelas[] | null
 }
 
 type Materi = {
   id_materi: string
-  id_mapel_kelas_guru: string
+  id_mkg: string
   nama_materi: string
   deskripsi: string | null
   url: string | null
@@ -67,9 +67,9 @@ export default function KelolaMateriPage() {
     }
 
     const { data: profile } = await supabase
-      .from("profiles")
+      .from("profil")
       .select("role, uid_guru")
-      .eq("id", userData.user.id)
+      .eq("user_id", userData.user.id)
       .single()
 
     if (!profile || profile.role !== "guru") {
@@ -109,7 +109,7 @@ export default function KelolaMateriPage() {
     const { data: mengajarData, error: mengajarError } = await supabase
       .from("mapel_kelas_guru")
       .select(`
-        id_mapel_kelas_guru,
+        id_mkg,
         mapel:id_mapel (
           nama_mapel
         ),
@@ -133,7 +133,7 @@ export default function KelolaMateriPage() {
     setMengajarList(daftarMengajar)
 
     const ids = daftarMengajar.map(
-      (item) => item.id_mapel_kelas_guru
+      (item) => item.id_mkg
     )
 
     if (ids.length === 0) {
@@ -146,13 +146,13 @@ export default function KelolaMateriPage() {
       .from("materi")
       .select(`
         id_materi,
-        id_mapel_kelas_guru,
+        id_mkg,
         nama_materi,
         deskripsi,
         url,
         created_at,
-        mapel_kelas_guru:id_mapel_kelas_guru (
-          id_mapel_kelas_guru,
+        mapel_kelas_guru:id_mkg (
+          id_mkg,
           mapel:id_mapel (
             nama_mapel
           ),
@@ -162,7 +162,7 @@ export default function KelolaMateriPage() {
           )
         )
       `)
-      .in("id_mapel_kelas_guru", ids)
+      .in("id_mkg", ids)
       .order("created_at", { ascending: false })
 
     if (error) {
@@ -259,7 +259,7 @@ export default function KelolaMateriPage() {
       const { error } = await supabase
         .from("materi")
         .update({
-          id_mapel_kelas_guru: idMengajar,
+          id_mkg: idMengajar,
           nama_materi: namaMateri,
           deskripsi,
           url: finalUrl || null,
@@ -273,7 +273,7 @@ export default function KelolaMateriPage() {
       }
     } else {
       const { error } = await supabase.from("materi").insert({
-        id_mapel_kelas_guru: idMengajar,
+        id_mkg: idMengajar,
         nama_materi: namaMateri,
         deskripsi,
         url: finalUrl || null,
@@ -293,7 +293,7 @@ export default function KelolaMateriPage() {
 
   const handleEdit = (item: Materi) => {
     setEditId(item.id_materi)
-    setIdMengajar(item.id_mapel_kelas_guru)
+    setIdMengajar(item.id_mkg)
     setNamaMateri(item.nama_materi)
     setDeskripsi(item.deskripsi ?? "")
     setUrl(item.url ?? "")
@@ -368,8 +368,8 @@ export default function KelolaMateriPage() {
 
                 {mengajarList.map((item) => (
                   <option
-                    key={item.id_mapel_kelas_guru}
-                    value={item.id_mapel_kelas_guru}
+                    key={item.id_mkg}
+                    value={item.id_mkg}
                   >
                     {getMengajarLabel(item)}
                   </option>
@@ -623,7 +623,7 @@ export default function KelolaMateriPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => handleEdit(item)}
-                  className="rounded-lg bg-yellow-100 p-2"
+                  className="rounded-lg bg-yellow-600 p-2"
                 >
                   <Pencil size={16} />
                 </button>
@@ -632,7 +632,7 @@ export default function KelolaMateriPage() {
                   onClick={() =>
                     handleDelete(item.id_materi)
                   }
-                  className="rounded-lg bg-red-100 p-2"
+                  className="rounded-lg bg-red-600 p-2"
                 >
                   <Trash2 size={16} />
                 </button>

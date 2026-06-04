@@ -28,14 +28,14 @@ type SiswaRelasi = {
 }
 
 type Mengajar = {
-  id_mapel_kelas_guru: string
+  id_mkg: string
   kelas: Kelas | Kelas[] | null
   mapel: Mapel | Mapel[] | null
 }
 
 type Tugas = {
   id_tugas: string
-  id_mapel_kelas_guru: string
+  id_mkg: string
   judul: string
   deskripsi: string | null
   deadline: string | null
@@ -48,7 +48,7 @@ type Tugas = {
 type TugasSiswa = {
   id_tugas_siswa: string
   id_tugas: string
-  nisn: string
+  id_siswa: string
   status: string | null
   nilai: number | null
   selesai_at: string | null
@@ -116,9 +116,9 @@ export default function GuruNilaiPage() {
     }
 
     const { data: profile } = await supabase
-      .from("profiles")
+      .from("profil")
       .select("role, uid_guru")
-      .eq("id", userData.user.id)
+      .eq("user_id", userData.user.id)
       .single()
 
     if (!profile || profile.role !== "guru") {
@@ -136,7 +136,7 @@ export default function GuruNilaiPage() {
     const { data: mengajarData, error: mengajarError } = await supabase
       .from("mapel_kelas_guru")
       .select(`
-        id_mapel_kelas_guru,
+        id_mkg,
         kelas:id_kelas (
           tingkat,
           nama_kelas
@@ -160,7 +160,7 @@ export default function GuruNilaiPage() {
     setMengajarList(daftarMengajar)
 
     const defaultMengajar =
-      selectedMengajar || daftarMengajar[0]?.id_mapel_kelas_guru || ""
+      selectedMengajar || daftarMengajar[0]?.id_mkg || ""
 
     setSelectedMengajar(defaultMengajar)
 
@@ -181,15 +181,15 @@ export default function GuruNilaiPage() {
       .from("tugas")
       .select(`
         id_tugas,
-        id_mapel_kelas_guru,
+        id_mkg,
         judul,
         deskripsi,
         deadline,
         tipe_tugas,
         status,
         created_at,
-        mapel_kelas_guru:id_mapel_kelas_guru (
-          id_mapel_kelas_guru,
+        mapel_kelas_guru:id_mkg (
+          id_mkg,
           kelas:id_kelas (
             tingkat,
             nama_kelas
@@ -199,7 +199,7 @@ export default function GuruNilaiPage() {
           )
         )
       `)
-      .eq("id_mapel_kelas_guru", idMengajar)
+      .eq("id_mkg", idMengajar)
       .order("created_at", { ascending: false })
 
     if (tugasError) {
@@ -212,7 +212,7 @@ export default function GuruNilaiPage() {
     const { data: mengajarDetail } = await supabase
       .from("mapel_kelas_guru")
       .select("id_kelas")
-      .eq("id_mapel_kelas_guru", idMengajar)
+      .eq("id_mkg", idMengajar)
       .single()
 
     let totalSiswaKelas = 0
@@ -281,13 +281,13 @@ export default function GuruNilaiPage() {
       .select(`
         id_tugas_siswa,
         id_tugas,
-        nisn,
+        id_siswa,
         status,
         nilai,
         selesai_at,
         jawaban,
         file_url,
-        siswa:nisn (
+        siswa:id_siswa (
           nama_lengkap
         )
       `)
@@ -399,7 +399,7 @@ export default function GuruNilaiPage() {
     const siswa = firstItem(item.siswa)
 
     return (
-      String(item.nisn).toLowerCase().includes(keyword) ||
+      String(item.id_siswa).toLowerCase().includes(keyword) ||
       String(siswa?.nama_lengkap ?? "").toLowerCase().includes(keyword) ||
       String(item.status ?? "").toLowerCase().includes(keyword)
     )
@@ -461,8 +461,8 @@ export default function GuruNilaiPage() {
           <option value="">Pilih Mapel dan Kelas</option>
           {mengajarList.map((item) => (
             <option
-              key={item.id_mapel_kelas_guru}
-              value={item.id_mapel_kelas_guru}
+              key={item.id_mkg}
+              value={item.id_mkg}
             >
               {getMengajarLabel(item)}
             </option>
@@ -624,7 +624,7 @@ export default function GuruNilaiPage() {
                                   {siswa?.nama_lengkap ?? "-"}
                                 </p>
                                 <p className="text-xs text-slate-500">
-                                  {item.nisn}
+                                  {item.id_siswa ?? "-"}
                                 </p>
                               </td>
                               <td className="py-3 pr-4 capitalize">
